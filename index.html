@@ -768,7 +768,7 @@ settings:{ title:"설정", enter:()=>{ void loadAudit(); }, html:()=>{
     +'<div class="setting-profile">'+avatarHTML(S.account,50)+'<div class="grow"><b style="font-size:17px">'+esc(S.account?.name||"팀원")+'</b><div class="small">'+esc(S.role||"")+' · '+TEAM+'</div><div class="small" style="margin-top:4px">'+(S.online?"최근 접속 "+when(S.sessionStart):"체험 모드 · 서버 저장 안 함")+'</div></div><span class="pill '+(S.online?"ok":"k")+'">'+(S.online?"LIVE":"DEMO")+'</span></div>'
     +'<div class="sec">전용 로그 DB</div>'
     +'<div class="audit-store"><div class="audit-meta"><b>감사 로그 저장소</b><span class="status">● '+status+'</span></div>'
-    +'<code>Vercel Blob / db/audit.json</code><div class="small" style="margin-top:7px">로그인 · 로그아웃 · 데이터 수정 · 판매계획 확정 · 계정 관리</div>'
+    +'<code>Vercel Blob / db/logtable/audit-v1.json</code><div class="small" style="margin-top:7px">로그인 · 로그아웃 · 데이터 수정 · 판매계획 확정 · 계정 관리</div>'
     +'<div class="small">기존 활동 기록과 별도 저장 · 인증된 팀원만 조회</div></div>'
     +'<div class="sec">로그테이블</div>'
     +'<button class="tapcard" data-go="logtable"><div class="ic">≡</div><div class="grow"><b>로그 기록 보기</b><div class="small">로그인 · 데이터 수정 · 판매계획 · 보안 변경 기록</div></div><span class="chev">›</span></button>'
