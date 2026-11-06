@@ -203,6 +203,7 @@ input[type=range]{width:100%;accent-color:var(--pri)}
 @media(prefers-reduced-motion:reduce){.tabitem .tabicon{transition:none!important}}
 </style>
 <link rel="stylesheet" href="/taste-ui.css?v=1">
+<link rel="stylesheet" href="/toss-ui.css?v=1">
 </head>
 <body>
 <div class="stage">
@@ -484,15 +485,31 @@ pin:{ title:"", noHome:true, html:()=>{
         ${[1,2,3,4,5,6,7,8,9,"",0,"←"].map(k=>k===""?"<span></span>":`<button class="iconbtn" data-key="${k}" style="width:100%;height:60px;font-size:24px;font-weight:700">${k}</button>`).join("")}
       </div></div>`; } },
 
-signup:{ title:"계정 만들기", noHome:true, html:()=>`<h1>새 계정을<br>만들게요</h1><p class="lead">이름과 소속을 넣고, 다음 화면에서 비밀번호 4자리를 정해요.</p>
-    <div class="sec" style="margin-top:0">이름</div>
-    <input class="field" id="suName" maxlength="20" placeholder="예: 홍길동" value="${esc(S.suName||"")}">
-    <div class="sec">소속</div>
-    ${ROLES.map(r=>`<button class="role ${S.suRole===r?'on':''}" data-surole="${r}"><span class="r"></span><span><b>${r}</b></span></button>`).join("")}`,
-  cta:()=>({label:"다음", go:()=>{ const n=($("suName")?.value||"").trim(); S.suName=n;
-      if(!n) return toast("이름을 입력해 주세요"); if(!S.suRole) return toast("소속을 골라 주세요");
-      if(S.accounts.some(a=>a.name===n)) return toast("같은 이름의 계정이 있어요. 목록에서 골라 주세요");
-      S.pinFor={id:null,name:n,role:S.suRole,hasPin:false,isNew:true}; S.pinRole=S.suRole; S.pin=""; S.pinStage="set"; S.pinErr=""; nav.push("pin"); }}) },
+signup:{ title:"계정 만들기", noHome:true, html:()=>`<div class="eyebrow">01 / 03 · 계정 등록</div><h1>이름을 먼저<br>입력해 주세요</h1><p class="lead">다음 단계에서 담당 직무를 고르고 비밀번호를 설정합니다.</p>
+    <div class="sec">이름</div><input class="field" id="suName" maxlength="20" placeholder="예: 홍길동" value="${esc(S.suName||"")}">`,
+  cta:()=>({label:"직무 설정으로",go:()=>{
+    const n=($("suName")?.value||"").trim(); if(!n)return toast("이름을 입력해 주세요");
+    if(S.accounts.some(a=>a.name===n))return toast("이미 등록된 이름입니다. 로그인 화면에서 선택해 주세요");
+    S.suName=n;S.suRole=null;S.pinFor={id:null,name:n,hasPin:false,isNew:true};
+    nav.push("signuprole");
+  }}) },
+signuprole:{ title:"직무 설정", noHome:true, html:()=>`<div class="eyebrow">02 / 03 · 직무 선택</div><h1>${esc(S.suName||S.pinFor?.name||"팀원")}님,<br>어떤 직무를 담당하시나요?</h1><p class="lead">선택한 직무에 맞는 업무 화면과 입력 권한이 적용됩니다.</p>
+  ${ROLES.map((role,i)=>`<button class="role ${S.suRole===role?"on":""}" data-join-role="${role}"><span class="ic">${i+1}</span><span style="flex:1"><b>${role}</b><br><span class="small">${["예측·확정·기준 관리","주문 입력·협의 의견","생산 가능 물량·제약 확인"][i]}</span></span><span class="chev">›</span></button>`).join("")}`,
+  cta:()=>({label:"비밀번호 설정으로",go:()=>{
+    if(!ROLES.includes(S.suRole))return toast("담당 직무를 선택해 주세요");
+    S.pinFor=S.pinFor||{id:null,name:S.suName,hasPin:false,isNew:true};
+    S.pinFor.role=S.suRole;S.pinRole=S.suRole;S.pin="";S.pinStage="set";S.pinErr="";
+    nav.push("pin");
+  }}) },
+changePin:{ title:"비밀번호 변경", noHome:true, html:()=>`<div class="eyebrow">ACCOUNT SECURITY</div><h1>비밀번호를<br>변경할게요</h1><p class="lead">현재 PIN을 확인한 뒤 새 PIN 4자리를 설정합니다. 다른 기기에 로그인된 세션은 종료됩니다.</p>
+  ${S.demo?'<div class="banner">체험 계정에서는 비밀번호를 변경할 수 없어요.</div>':`
+    <div class="work-form">
+      <label>현재 비밀번호<input class="field" type="password" id="oldPin" autocomplete="current-password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="기존 PIN 4자리"></label>
+      <label>새 비밀번호<input class="field" type="password" id="newPin" autocomplete="new-password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="새 PIN 4자리"></label>
+      <label>새 비밀번호 확인<input class="field" type="password" id="newPinAgain" autocomplete="new-password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="한 번 더 입력"></label>
+      <button class="btn" data-change-pin>변경하기</button>
+    </div>`}
+  <p class="small">PIN은 서버에서 해시로만 저장되며, 변경 내역만 로그테이블에 기록됩니다.</p>` },
 
 /* ---------- 홈 ---------- */
 home:{ title:"", right:"records", html:()=>{
@@ -756,6 +773,7 @@ settings:{ title:"설정", enter:()=>{ void loadAudit(); }, html:()=>{
     +'<button class="tapcard" data-go="logtable"><div class="ic">≡</div><div class="grow"><b>로그 기록 보기</b><div class="small">로그인 · 데이터 수정 · 판매계획 · 보안 변경 기록</div></div><span class="chev">›</span></button>'
     +'<p class="small" style="margin:9px 0 0">초기화 이전의 기록은 삭제하고 이후 발생한 로그만 표시합니다. 현재 '+fmt(S.auditTotal||0)+'건</p>'
     +'<div class="sec">앱 관리</div>'
+    +'<button class="tapcard" data-go="changePin"><div class="ic">🔒</div><div class="grow"><b>비밀번호 변경</b><div class="small">현재 PIN 확인 후 새로운 4자리 설정</div></div><span class="chev">›</span></button>'
     +'<button class="tapcard" data-go="server"><div class="ic k">DB</div><div class="grow"><b>저장소·API 구조</b><div class="small">데이터가 저장되는 위치 확인</div></div><span class="chev">›</span></button>'
     +'<button class="tapcard" data-logout><div class="ic">↪</div><div class="grow"><b>로그아웃</b><div class="small">현재 세션 종료 및 기록 저장</div></div><span class="chev">›</span></button>'
     +'<p class="small" style="margin:12px 0 15px">PIN 원문은 저장되지 않으며, 비공개 감사 로그는 팀 인증 후에만 조회됩니다.</p>';
@@ -949,9 +967,11 @@ document.addEventListener("click",async e=>{
   if(d.go) return nav.push(d.go);
   if(d.cta!=null){ const c=SCREENS[nav.cur()].cta(); if(!c||c.disabled) return; if(typeof c.go==="function") return c.go(); return nav.push(c.go); }
   if(d.demo!=null){ S.pinFor=DEMO_ACCOUNT; S.pin=""; S.pinStage="check"; S.pinRole=DEMO_ACCOUNT.role; S.pinErr=""; return nav.push("pin"); }
-   if(d.acc){ const a=S.accounts.find(x=>x.id===d.acc); if(!a) return; S.pinFor=a; S.pin=""; S.pinStage=a.hasPin?"check":"set"; S.pinRole=a.role||null; S.pinErr=""; return nav.push("pin"); }
+   if(d.acc){ const a=S.accounts.find(x=>x.id===d.acc); if(!a) return; S.pinFor=a; S.pin=""; S.pinStage=a.hasPin?"check":"set"; S.pinRole=a.role||null; S.pinErr=""; if(!a.hasPin){ S.suName=a.name; S.suRole=a.role||null; return nav.push("signuprole"); } return nav.push("pin"); }
   if(d.pinrole){ S.pinRole=d.pinrole; refresh(); return; }
   if(d.surole){ const el=$("suName"); if(el) S.suName=el.value; S.suRole=d.surole; refresh(); return; }
+  if(d.joinRole){ S.suRole=d.joinRole; refresh(); return; }
+  if(d.changePin!=null) return changePassword();
   if(d.key!=null){ return pinKey(d.key); }
   if(d.model){ S.selModel=d.model; return nav.push("detail"); }
   if(d.method){ S.method[S.selModel]=d.method; refresh(); return; }
@@ -981,6 +1001,18 @@ document.addEventListener("change",e=>{
   if(t.dataset.qty){ S.agreed[t.dataset.qty].qty=+t.value.replace(/[^\d]/g,"")||0; refresh(); }
   if(t.dataset.special){ S.special[t.dataset.special]=t.checked; refresh(); }
 });
+
+async function changePassword(){
+  if(S.demo||!S.online)return toast("실제 팀 계정에서만 변경할 수 있어요");
+  const oldPin=$("oldPin")?.value||"",newPin=$("newPin")?.value||"",confirm=$("newPinAgain")?.value||"";
+  if(!/^\d{4}$/.test(oldPin)||!/^\d{4}$/.test(newPin))return toast("4자리 숫자로 입력해 주세요");
+  if(newPin!==confirm)return toast("새 비밀번호 두 번이 다릅니다");
+  if(oldPin===newPin)return toast("기존 비밀번호와 다른 번호로 설정해 주세요");
+  const submit=document.querySelector("[data-change-pin]");if(submit)submit.disabled=true;
+  try{const res=await api("password",{method:"POST",body:{currentPin:oldPin,newPin}});
+    toast(res.message||"비밀번호를 변경했어요");nav.reset("settings");S.auditStatus="idle";loadAudit();
+  }catch(e){ toast(e.message||"변경에 실패했어요");if(submit)submit.disabled=false; }
+}
 
 async function pinKey(k){
   if(S.pinBusy) return;
