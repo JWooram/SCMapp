@@ -4,6 +4,7 @@ import { P, fresh, json, fail, body, currentAccount, log, withErrors } from "./_
 export async function PUT(req) {
   return withErrors(async () => {
     const { acc } = await currentAccount(req); if (!acc) return fail("로그인이 필요해요", 401);
+    if (acc.role !== "SCM 수요계획팀") return fail("판매실적 수정은 SCM 담당자만 가능합니다", 403);
     const { start, series, orders, note } = await body(req);
     if (!start || typeof series !== "object" || !Array.isArray(orders)) return fail("데이터 형식이 올바르지 않아요");
     if (Object.keys(series).length > 50 || orders.length > 2000 || JSON.stringify(series).length > 200000) return fail("데이터가 너무 커요");
