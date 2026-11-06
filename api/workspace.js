@@ -11,7 +11,7 @@ const at = () => new Date().toISOString();
 const clean = (v, max = 160) => String(v ?? "").trim().replace(/[<>]/g, "").slice(0, max);
 const qty = v => Number.isSafeInteger(Number(v)) && Number(v) >= 0 && Number(v) <= 999999 ? Number(v) : null;
 const periodOK = v => /^20\d{2}-(0[1-9]|1[0-2])$/.test(String(v));
-const modelOK = name => Object.hasOwn(SAMPLE_DATASET.series, name);
+const modelOK = (name, d) => Object.hasOwn(SAMPLE_DATASET.series, name) || ((d && d.models) || []).includes(name);
 const limitList = (list, n = 300) => list.slice(0, n);
 const blank = () => ({ version: 1, rules: { threshold: 8, at: null, by: null },
   orders: [], inventory: [], capacities: [], overrides: [], exceptions: [], transfers: [] });
@@ -21,7 +21,7 @@ const actionRoles = {
   "capacity.save": [PROD], "inventory.save": [PROD], "transfer.ack": [PROD],
   "forecast.save": [SCM], "rules.save": [SCM], "exception.create": [SCM],
   "exception.reply": [SALES, PROD], "exception.decide": [SCM],
-  "transfer.send": [SCM]
+  "transfer.send": [SCM], "model.add": [PROD, SCM]
 };
 export async function GET(req) {
   return withErrors(async () => {
@@ -47,7 +47,7 @@ export async function POST(req) {
       const bad = msg => { error = msg; };
       if (action === "order.create") {
         const q = qty(a.quantity), dealer = clean(a.dealer, 70), model = clean(a.model, 50);
-        if (!dealer || !modelOK(model) || q == null || q < 1) return bad("영업점·차종·수량을 확인해 주세요");
+        if (!dealer || !modelOK(model, d) || q == null || q < 1) return bad("영업점·차종·수량을 확인해 주세요");
         result = { id: uid(), dealer, model, spec: clean(a.spec, 70), region: clean(a.region, 50) || "미지정",
           quantity: q, reason: clean(a.reason, 280), status: "접수", targetMonth: periodOK(a.targetMonth) ? a.targetMonth : null,
           eta: null, by: acc.id, at: t };
@@ -60,12 +60,12 @@ export async function POST(req) {
         if (!reason) return bad("변경 사유를 입력해 주세요");
         o.reason = reason; o.updatedAt = t; result = o; event = `${o.model} 주문 변경 사유 갱신`;
       } else if (action === "inventory.save") {
-        if (!modelOK(a.model) || qty(a.finished) == null || qty(a.parts) == null) return bad("차종 및 재고 수량이 올바르지 않습니다");
+        if (!modelOK(a.model, d) || qty(a.finished) == null || qty(a.parts) == null) return bad("차종 및 재고 수량이 올바르지 않습니다");
         result = { model: a.model, finished: qty(a.finished), parts: qty(a.parts), at: t, by: acc.id };
         d.inventory = [result, ...d.inventory.filter(x => x.model !== a.model)];
         event = `${a.model} 완성차·부품 재고 반영`;
       } else if (action === "capacity.save") {
-        if (!modelOK(a.model) || !periodOK(a.month) || !clean(a.line, 60) || qty(a.capacity) == null || qty(a.partsLimit) == null)
+        if (!modelOK(a.model, d) || !periodOK(a.month) || !clean(a.line, 60) || qty(a.capacity) == null || qty(a.partsLimit) == null)
           return bad("차종·기간·라인 및 생산 가능 수량을 확인해 주세요");
         result = { model: a.model, month: a.month, line: clean(a.line, 60), capacity: qty(a.capacity),
           partsLimit: qty(a.partsLimit), note: clean(a.note, 220), at: t, by: acc.id };
@@ -73,7 +73,7 @@ export async function POST(req) {
         event = `${result.model} ${result.month} 생산 가능 물량 입력`;
       } else if (action === "forecast.save") {
         const f = qty(a.forecast), r = qty(a.revised), actual = qty(a.actual);
-        if (!modelOK(a.model) || !periodOK(a.month) || f == null || r == null || actual == null) return bad("예측·수주·수정 수량을 확인해 주세요");
+        if (!modelOK(a.model, d) || !periodOK(a.month) || f == null || r == null || actual == null) return bad("예측·수주·수정 수량을 확인해 주세요");
         result = { model: a.model, month: a.month, region: clean(a.region, 50) || "전체", forecast: f, revised: r,
           actual, reason: clean(a.reason, 240), by: acc.id, at: t };
         d.overrides = [result, ...d.overrides.filter(x => !(x.model === result.model && x.month === result.month && x.region === result.region))].slice(0, 300);
@@ -84,7 +84,7 @@ export async function POST(req) {
         d.rules = { threshold: n, by: acc.id, at: t };
         result = d.rules; event = `예외 판정 기준 ±${n}% 변경`;
       } else if (action === "exception.create") {
-        if (!modelOK(a.model) || !periodOK(a.month) || qty(a.forecast) == null || qty(a.actual) == null)
+        if (!modelOK(a.model, d) || !periodOK(a.month) || qty(a.forecast) == null || qty(a.actual) == null)
           return bad("협의 항목의 차종·기간·수량을 확인해 주세요");
         if (d.exceptions.some(x => x.model === a.model && x.month === a.month && x.status === "협의중"))
           return bad("해당 월·차종의 진행 중인 협의가 이미 있습니다");
@@ -110,6 +110,13 @@ export async function POST(req) {
         x.decidedQty = qty(a.finalQty); x.decision = decision; x.status = "확정";
         x.decidedBy = acc.id; x.decidedAt = t; result = x;
         event = `${x.model} 예외 협의 최종 결정 ${x.decidedQty}대`;
+      } else if (action === "model.add") {
+        const name = clean(a.name, 30);
+        d.models ||= [];
+        if (!name) return bad("차종 이름을 입력해 주세요");
+        if (Object.hasOwn(SAMPLE_DATASET.series, name) || d.models.includes(name)) return bad("이미 있는 차종이에요");
+        if (d.models.length >= 50) return bad("차종은 50개까지 추가할 수 있어요");
+        d.models.push(name); result = { name }; event = `차종 추가: ${name}`;
       } else if (action === "transfer.send") {
         if (!periodOK(a.month)) return bad("계획 기간을 확인해 주세요");
         // 확정된 판매계획만 생산기획팀에 전달합니다.
