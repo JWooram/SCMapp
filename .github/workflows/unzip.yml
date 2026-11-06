@@ -1,0 +1,22 @@
+name: unzip-app
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: zip 풀어서 앱 코드 배치
+        run: |
+          if [ ! -f scm-demand-app.zip ]; then echo "zip 없음"; exit 0; fi
+          unzip -o scm-demand-app.zip -d .
+          git rm -q scm-demand-app.zip
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "zip 풀어서 앱 코드 배치" || exit 0
+          git push
