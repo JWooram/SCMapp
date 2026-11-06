@@ -296,7 +296,7 @@ function applyBoot(d){
 async function boot(){
   try{ const d=await api("bootstrap"); S.online=true; applyBoot(d); if(d.me) S.resumed=true; }
   catch(e){ S.online=false; seedLocal(); }
-  setInterval(poll,15000);
+  setInterval(poll,30000); // 저장소 사용량 절약: 30초마다
   document.addEventListener("visibilitychange",()=>{ if(!document.hidden) poll(); });
   return S.online;
 }
