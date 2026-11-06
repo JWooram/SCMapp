@@ -9,6 +9,7 @@ export const P = {
   dataset: "db/dataset.json",
   plans: "db/plans.json",
   activity: "db/activity.json",
+  audit: "db/audit.json",
 };
 const now = () => new Date().toISOString();
 const id = (n = 10) => crypto.randomBytes(n).toString("base64url");
@@ -20,6 +21,7 @@ export const fresh = {
   dataset: () => ({ ...JSON.parse(JSON.stringify(SAMPLE_DATASET)), updatedBy: null, updatedAt: now(), note: "예시 데이터 (가상의 숫자)" }),
   plans: () => ({ list: [] }),
   activity: () => ({ list: [] }),
+  audit: () => ({ version: 1, list: [] }),
 };
 
 /* ---------- HTTP 도우미 ---------- */
@@ -57,8 +59,13 @@ export function publicAccount(a) {
 }
 
 /* ---------- 활동 기록 ---------- */
-export async function log(type, text, accountId) {
-  await update(P.activity, fresh.activity, d => { d.list.unshift({ id: id(6), type, text, by: accountId || null, at: now() }); d.list = d.list.slice(0, 300); });
+export async function log(type, text, accountId, meta = {}) {
+  const entry = { id: id(8), type, text, by: accountId || null, at: now() };
+  // 업무 요약 기록과 전용 감사 로그는 서로 다른 비공개 Blob JSON에 보관합니다.
+  await Promise.all([
+    update(P.activity, fresh.activity, d => { d.list.unshift(entry); d.list = d.list.slice(0, 300); }),
+    update(P.audit, fresh.audit, d => { d.list.unshift({ ...entry, meta }); d.list = d.list.slice(0, 1000); })
+  ]);
 }
 
 /* ---------- 세션 ---------- */
@@ -84,7 +91,7 @@ export async function startSession(acc, req) {
         recentLogins: [at, ...(a.recentLogins || [])].slice(0, 10) });
       return a;
     }),
-    log("login", `${acc.name} 로그인 (${acc.role})`, acc.id)
+    log("login", `${acc.name} 로그인 (${acc.role})`, acc.id, {device:ses.device})
   ]);
   return { token, ses, acc: updated };
 }
@@ -95,7 +102,7 @@ export async function endSession(req) {
   await update(P.sessions, fresh.sessions, d => { const s = d.list.find(x => x.id === ses.id); if (s) Object.assign(s, { logoutAt: at, durationMin: dur }); });
   if (acc) {
     await update(P.accounts, fresh.accounts, d => { const a = d.list.find(x => x.id === acc.id); if (a) Object.assign(a, { online: false, lastLogoutAt: at, currentSession: null }); });
-    await log("logout", `${acc.name} 로그아웃 (${dur}분 사용)`, acc.id);
+    await log("logout", `${acc.name} 로그아웃 (${dur}분 사용)`, acc.id, {durationMin:dur});
   }
   return { acc, dur };
 }
