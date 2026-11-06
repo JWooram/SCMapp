@@ -17,7 +17,7 @@ export async function GET(req) {
       list: list.slice(0, 120),
       total: list.length,
       counts,
-      storage: "Vercel Blob · db/audit.json",
+      storage: "Vercel Blob · db/logtable/audit-v1.json",
       note: "전용 로그 저장소 활성화 이후의 기록입니다."
     });
   });
