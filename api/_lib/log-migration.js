@@ -8,6 +8,8 @@ let completed = false;
 
 export async function retireLegacyLogs() {
   if (completed) return true;
+  // Upstash Redis 저장소는 새로 시작하므로 예전 Blob 로그 정리가 필요 없음
+  if (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) { completed = true; return true; }
   const { data: state } = await read(MARKER, () => ({ done: false }));
   if (state.done) { completed = true; return true; }
 
