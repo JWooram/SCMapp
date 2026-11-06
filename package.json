@@ -1,0 +1,9 @@
+{
+  "name": "scm-demand-helper",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@vercel/blob": "latest"
+  },
+  "engines": { "node": "22.x" }
+}

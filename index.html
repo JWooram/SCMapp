@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SCM 수요예측 도우미</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --pri:#2F6BEA; --pri-press:#2459C9; --pri-pale:#EAF1FE;
+  --ink:#191F28; --ink2:#4E5968; --muted:#8B95A1; --line:#E5E8EB; --fill:#F2F4F6; --fill2:#F9FAFB;
+  --ok:#0B8A5C; --ok-pale:#E3F5EC; --warn:#C25A00; --warn-pale:#FFF1E4; --bad:#D63B3B;
+  --chartA:#2563B8; --chartF:#C96A00;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;font-family:"Noto Sans KR",system-ui,sans-serif;color:var(--ink);background:#E9ECF1;font-size:15px;line-height:1.5;letter-spacing:-.01em}
+button,input,select,textarea{font:inherit;color:inherit;letter-spacing:inherit}
+button{cursor:pointer}
+
+/* phone frame */
+.stage{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+.phone{position:relative;width:390px;height:min(844px,calc(100vh - 48px));background:#fff;border-radius:36px;overflow:hidden;box-shadow:0 30px 80px rgba(25,31,40,.18),0 0 0 10px #191F28}
+@media (max-width:480px){.stage{padding:0}.phone{width:100%;height:100vh;border-radius:0;box-shadow:none}}
+
+/* screens */
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;background:#fff;transition:transform .34s cubic-bezier(.2,.8,.2,1),opacity .34s;will-change:transform}
+.screen.enter{transform:translateX(100%)}
+.screen.leave{transform:translateX(-28%);opacity:.6}
+.screen.enter-back{transform:translateX(-28%);opacity:.6}
+.screen.leave-back{transform:translateX(100%)}
+.topbar{height:56px;flex:0 0 56px;display:flex;align-items:center;padding:0 8px;gap:4px}
+.topbar .title{flex:1;text-align:center;font-weight:700;font-size:16px;margin-right:40px}
+.iconbtn{width:40px;height:40px;border:0;background:transparent;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--ink)}
+.iconbtn:active{background:var(--fill)}
+.chap{display:flex;gap:4px;padding:0 20px 6px}
+.chap div{flex:1;text-align:center;font-size:11px;font-weight:700;color:#B0B8C1}
+.chap div i{display:block;height:3px;border-radius:2px;background:var(--fill);margin-bottom:5px}
+.chap div.done i{background:#A9C2F6}
+.chap div.on{color:var(--pri)}.chap div.on i{background:var(--pri)}
+.body{flex:1;overflow-y:auto;padding:12px 24px 24px;-webkit-overflow-scrolling:touch}
+.body::-webkit-scrollbar{width:0}
+.cta{flex:0 0 auto;padding:12px 20px 22px;background:linear-gradient(to top,#fff 75%,rgba(255,255,255,0));display:flex;gap:8px}
+.btn{flex:1;height:56px;border:0;border-radius:16px;background:var(--pri);color:#fff;font-weight:700;font-size:16.5px;transition:transform .08s,background .15s}
+.btn:active{transform:scale(.98);background:var(--pri-press)}
+.btn.sub{background:var(--fill);color:var(--ink2)}
+.btn.sub:active{background:#E5E8EB}
+.btn:disabled{background:#C9D6F5;cursor:not-allowed}
+
+/* type */
+.eyebrow{font-size:13px;font-weight:700;color:var(--pri);margin:4px 0 6px}
+h1{font-size:25px;line-height:1.38;font-weight:800;margin:0 0 10px;letter-spacing:-.02em}
+h1 em{font-style:normal;color:var(--pri)}
+.lead{color:var(--ink2);font-size:15px;margin:0 0 22px}
+.sec{font-size:13px;font-weight:700;color:var(--muted);margin:26px 0 10px}
+.src{font-size:11.5px;color:var(--muted);margin-top:20px;line-height:1.55}
+.small{font-size:13px;color:var(--ink2)}
+.mute{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+
+/* blocks */
+.card{background:var(--fill2);border-radius:18px;padding:16px 18px}
+.card + .card{margin-top:10px}
+.row{display:flex;align-items:center;gap:12px;padding:13px 0}
+.row + .row{border-top:1px solid var(--fill)}
+.row .grow{flex:1;min-width:0}
+.row .t{font-weight:700}
+.row .s{font-size:13px;color:var(--ink2)}
+.ic{width:40px;height:40px;flex:0 0 40px;border-radius:12px;background:var(--pri-pale);color:var(--pri);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+.ic.o{background:var(--warn-pale);color:var(--warn)}
+.ic.g{background:var(--ok-pale);color:var(--ok)}
+.ic.k{background:var(--fill);color:var(--ink2)}
+.big{font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1.1}
+.big small{font-size:18px;font-weight:700;color:var(--ink2);margin-left:2px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--fill2);border-radius:16px;padding:14px 12px}
+.stat .v{font-size:26px;font-weight:800;color:var(--pri);line-height:1.15}
+.stat .l{font-size:12.5px;font-weight:700;margin-top:2px}
+.stat .d{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4}
+.pill{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;border-radius:999px;padding:3px 9px;white-space:nowrap}
+.pill.ok{background:var(--ok-pale);color:var(--ok)}
+.pill.warn{background:var(--warn-pale);color:var(--warn)}
+.pill.pri{background:var(--pri-pale);color:var(--pri)}
+.pill.k{background:var(--fill);color:var(--ink2)}
+.tapcard{width:100%;text-align:left;border:0;background:var(--fill2);border-radius:18px;padding:16px 18px;display:flex;align-items:center;gap:12px}
+.tapcard:active{background:var(--fill)}
+.tapcard + .tapcard{margin-top:10px}
+.chev{color:#B0B8C1;font-size:18px}
+.hero{background:var(--pri);color:#fff;border-radius:22px;padding:22px 20px;margin-top:6px}
+.hero .k{font-size:13px;opacity:.85;font-weight:700}
+.hero .h{font-size:21px;font-weight:800;line-height:1.4;margin:6px 0 16px}
+.hero button{border:0;background:#fff;color:var(--pri);font-weight:800;border-radius:12px;padding:11px 16px}
+.steps{counter-reset:s;margin:0;padding:0;list-style:none}
+.steps li{display:flex;gap:12px;padding:10px 0;align-items:flex-start}
+.steps li b{flex:0 0 26px;height:26px;border-radius:50%;background:var(--fill);color:var(--ink2);font-size:13px;display:flex;align-items:center;justify-content:center}
+.steps li.hot b{background:var(--warn-pale);color:var(--warn)}
+.steps .t{font-weight:700;font-size:14.5px}
+.steps .s{font-size:12.5px;color:var(--ink2)}
+.quote{border-left:3px solid var(--pri);padding:2px 0 2px 12px;font-size:14px;color:var(--ink);margin:6px 0 8px}
+.matrix{display:grid;grid-template-columns:1fr 1fr;gap:6px;position:relative}
+.matrix div{border-radius:14px;padding:14px 10px;text-align:center;font-size:12.5px;color:var(--ink2);min-height:78px;display:flex;flex-direction:column;justify-content:center}
+.matrix div b{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
+.matrix .hot{background:var(--pri);color:#DCE7FD}.matrix .hot b{color:#fff}
+.flow{display:flex;flex-direction:column;align-items:stretch;gap:6px}
+.flow .n{background:var(--fill2);border-radius:14px;padding:11px 14px;font-size:14px}
+.flow .n b{color:var(--ink)}
+.flow .n .s{font-size:12px;color:var(--ink2)}
+.flow .d{background:#fff;border:1.5px dashed var(--pri);color:var(--pri);border-radius:14px;padding:9px 14px;font-size:13.5px;font-weight:700}
+.flow .ar{text-align:center;color:#B0B8C1;font-size:12px;line-height:1}
+.ladder div{border-radius:14px;padding:12px 14px;background:var(--fill2);margin-bottom:6px}
+.ladder div.hot{background:var(--warn-pale)}
+.ladder b{font-size:14px}
+.ladder span{display:block;font-size:12.5px;color:var(--ink2)}
+.cmp{width:100%;border-collapse:collapse;font-size:13.5px}
+.cmp td{padding:11px 4px;border-top:1px solid var(--fill)}
+.cmp tr:first-child td{border-top:0}
+.cmp td:first-child{color:var(--ink2);width:30%}
+.cmp .a{color:var(--muted);text-decoration:line-through;text-decoration-color:#C9CED4}
+.cmp .b{font-weight:800}
+.cmp .tg{font-size:11px;color:var(--muted);white-space:nowrap;text-align:right}
+
+/* list rows for models */
+.mrow{width:100%;border:0;background:transparent;text-align:left;display:flex;align-items:center;gap:12px;padding:14px 2px}
+.mrow + .mrow{border-top:1px solid var(--fill)}
+.mrow:active{background:var(--fill2)}
+.mrow .nm{font-weight:700}
+.mrow .sb{font-size:12.5px;color:var(--muted)}
+.mrow .val{font-weight:800;text-align:right}
+.seg{display:flex;background:var(--fill);border-radius:12px;padding:3px;gap:2px;overflow-x:auto}
+.seg button{flex:1 0 auto;border:0;background:transparent;padding:8px 10px;border-radius:9px;font-size:12.5px;font-weight:700;color:var(--ink2);white-space:nowrap}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:7px 13px;font-size:13.5px;font-weight:700;color:var(--ink2)}
+.chip.on{border-color:var(--pri);background:var(--pri-pale);color:var(--pri)}
+.stepper{display:flex;align-items:center;justify-content:space-between;background:var(--fill2);border-radius:16px;padding:8px}
+.stepper button{width:44px;height:44px;border:0;border-radius:12px;background:#fff;font-size:22px;font-weight:700;color:var(--ink2)}
+.stepper input{width:120px;text-align:center;border:0;background:transparent;font-size:26px;font-weight:800}
+.stepper input:focus{outline:none}
+.field{width:100%;border:1.5px solid var(--line);border-radius:14px;padding:13px 14px;font-size:15px}
+.field:focus{outline:none;border-color:var(--pri)}
+.check{display:flex;gap:12px;align-items:center;padding:12px 0}
+.check .dot{width:28px;height:28px;border-radius:50%;flex:0 0 28px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;background:var(--fill);color:#B0B8C1;transition:all .25s}
+.check.done .dot{background:var(--pri);color:#fff}
+.check.warn .dot{background:var(--warn);color:#fff}
+.check .t{font-weight:700}
+.check .s{font-size:12.5px;color:var(--ink2)}
+.avatar{width:56px;height:56px;border-radius:50%;object-fit:cover;background:var(--fill)}
+.role{width:100%;border:1.5px solid var(--line);background:#fff;border-radius:16px;padding:15px 16px;text-align:left;display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.role.on{border-color:var(--pri);background:var(--pri-pale)}
+.role .r{width:22px;height:22px;border-radius:50%;border:2px solid #C9CED4;flex:0 0 22px}
+.role.on .r{border:7px solid var(--pri)}
+.spin{width:64px;height:64px;border-radius:50%;border:5px solid var(--pri-pale);border-top-color:var(--pri);animation:sp 0.9s linear infinite;margin:40px auto 24px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.donecheck{width:84px;height:84px;border-radius:50%;background:var(--pri);margin:36px auto 22px;display:flex;align-items:center;justify-content:center;animation:pop .45s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+.feed .row .s{font-size:12px}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--fill2);border-radius:12px;padding:12px;white-space:pre;overflow-x:auto;color:var(--ink2)}
+.banner{background:var(--warn-pale);color:var(--warn);font-size:12.5px;font-weight:700;border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.chartwrap{position:relative;margin:4px -4px 0}
+.chartwrap svg{display:block;width:100%;height:auto}
+.ctip{position:absolute;top:4px;background:#191F28;color:#fff;border-radius:10px;padding:6px 9px;font-size:11.5px;pointer-events:none;opacity:0;transition:opacity .1s;white-space:nowrap}
+.legend{display:flex;gap:12px;font-size:11.5px;color:var(--ink2);margin-top:4px}
+.legend i{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+
+/* sheet */
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .25s;z-index:20}
+.dim.on{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:24px 24px 0 0;padding:10px 24px 24px;transform:translateY(105%);transition:transform .3s cubic-bezier(.2,.8,.2,1);z-index:21}
+.sheet.on{transform:none}
+.sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 16px}
+.toast{position:absolute;left:50%;bottom:96px;transform:translate(-50%,10px);background:rgba(25,31,40,.92);color:#fff;padding:10px 16px;border-radius:12px;font-size:13.5px;opacity:0;transition:all .2s;pointer-events:none;z-index:30;white-space:nowrap}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+input[type=range]{width:100%;accent-color:var(--pri)}
+</style>
+</head>
+<body>
+<div class="stage"><div class="phone" id="phone">
+  <div class="dim" id="dim"></div>
+  <div class="sheet" id="sheet"><div class="grab"></div><div id="sheetBody"></div></div>
+  <div class="toast" id="toast"></div>
+</div></div>
+
+<script>
+/* =========================================================
+   1. 기본 데이터 (서버에 데이터가 없을 때만 쓰는 예시값)
+   ========================================================= */
+const SAMPLE = {
+  start:{y:2024,m:11},
+  series:{
+    "세단 A":[1081,1107,1098,1129,1150,1217,1296,1290,1310,1265,1244,1210,1129,1215,1220,1253,1220,1260,1323,1355,1380,1351,1344,1277],
+    "세단 B":[799,796,773,843,830,861,827,828,832,825,826,799,769,751,765,819,784,825,841,797,830,848,748,773],
+    "SUV C":[1252,1224,1307,1338,1351,1513,1561,1601,1622,1554,1505,1408,1461,1412,1448,1470,1551,1637,1766,1661,1684,1729,1738,1664],
+    "SUV D":[435,385,584,551,576,761,806,760,755,734,762,654,614,605,484,704,733,756,633,733,817,614,672,703],
+    "전기차 E":[275,319,332,351,383,413,434,465,467,484,509,513,519,554,580,588,608,646,672,692,726,718,751,741],
+    "소형 F":[295,307,312,313,313,316,319,325,316,317,315,305,309,306,321,308,306,311,318,328,null,318,327,281]
+  },
+  orders:[
+    {no:"D-1001",dealer:"광주 상무점",model:"세단 A",qty:120},{no:"D-1002",dealer:"서울 강남점",model:"SUV C",qty:210},
+    {no:"D-1003",dealer:"부산 해운대점",model:"전기차 E",qty:140},{no:"D-1004",dealer:"대전 둔산점",model:"세단 B",qty:90},
+    {no:"D-1005",dealer:"광주 상무점",model:"SUV D",qty:75},{no:"D-1006",dealer:"서울 강남점",model:"세단 A",qty:160},
+    {no:"D-1007",dealer:"부산 해운대점",model:"SUV C",qty:180},{no:"D-1007",dealer:"부산 해운대점",model:"SUV C",qty:180},
+    {no:"D-1008",dealer:"대전 둔산점",model:"전기차 E",qty:110},{no:"D-1009",dealer:"광주 첨단점",model:"",qty:60},
+    {no:"D-1010",dealer:"서울 마포점",model:"소형 F",qty:45},{no:"D-1004",dealer:"대전 둔산점",model:"세단 B",qty:90}
+  ]
+};
+const ROLES = ["SCM 수요계획팀","영업팀","생산기획팀"];
+const TEAM = "HINT 2기 1조";
+const TEAM_MEMBERS = ["장인우","정재엽","양건휘","장우람","김주영"];
+
+/* =========================================================
+   2. 상태
+   ========================================================= */
+const S = {
+  online:false, uid:null, me:null, canWrite:null, role:null, member:null,
+  dataset: clone(SAMPLE), datasetFromServer:false,
+  limit:8, method:{}, special:{}, agreed:{},
+  plans:[], activity:[], accounts:[], account:null, lastSaved:null
+};
+let user=null;
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=n=>(n==null||!isFinite(n))?"–":Math.round(n).toLocaleString("ko-KR");
+const p1=n=>(n==null||!isFinite(n))?"–":n.toFixed(1)+"%";
+function mLabel(i){ const t=S.dataset.start.y*12+(S.dataset.start.m-1)+i; return `${Math.floor(t/12)}.${String(t%12+1).padStart(2,"0")}`; }
+function nLen(){ return Object.values(S.dataset.series)[0].length; }
+function planMonth(){ return mLabel(nLen()).replace(".","-"); }
+function planMonthKo(){ const [y,m]=planMonth().split("-"); return `${+m}월`; }
+function when(iso){ if(!iso) return ""; const d=new Date(iso); const p=n=>String(n).padStart(2,"0"); return `${d.getMonth()+1}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+let toastT; function toast(t){ const e=$("toast"); e.textContent=t; e.classList.add("on"); clearTimeout(toastT); toastT=setTimeout(()=>e.classList.remove("on"),1900); }
+
+/* =========================================================
+   3. 서버 (Vercel Functions /api · Vercel Blob 저장)
+   ========================================================= */
+async function api(path,opt={}){
+  const r=await fetch("/api/"+path,{method:opt.method||"GET",headers:opt.body?{"content-type":"application/json"}:{},body:opt.body?JSON.stringify(opt.body):undefined,credentials:"same-origin",cache:"no-store"});
+  let d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok){ const err=new Error(d.error||"서버 오류"); err.status=r.status; err.data=d; throw err; }
+  return d;
+}
+function applyBoot(d){
+  S.accounts=d.accounts||[]; S.plans=d.plans||[]; S.activity=d.activity||[]; S.server=d.server;
+  if(d.dataset&&d.dataset.series&&!S.editing){ S.dataset={start:d.dataset.start,series:clone(d.dataset.series),orders:clone(d.dataset.orders||[])}; S.datasetFromServer=true; S.lastSaved={by:d.dataset.updatedBy,at:d.dataset.updatedAt}; }
+  if(d.me){ S.account=d.me; S.role=d.me.role; S.sessionId=d.me.sessionId; S.sessionStart=d.me.sessionStart; if(d.me.limit) S.limit=d.me.limit; }
+  else if(S.account){ S.account=null; }
+}
+async function boot(){
+  try{ const d=await api("bootstrap"); S.online=true; applyBoot(d); if(d.me) S.resumed=true; }
+  catch(e){ S.online=false; seedLocal(); }
+  setInterval(poll,15000);
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden) poll(); });
+  return S.online;
+}
+async function poll(){ // 15초마다 팀 데이터 새로고침 (다른 사람 작업 반영)
+  if(!S.online||document.hidden) return;
+  try{ const had=!!S.account; const d=await api("bootstrap"); applyBoot(d);
+    if(had&&!d.me){ S.account=null; nav.reset("login"); toast("로그인이 끝났어요. 다시 로그인해 주세요"); return; }
+    if(!["pin","signup","exception","loading","confirm"].includes(nav.cur())) refresh(); }catch(e){}
+}
+function seedLocal(){ TEAM_MEMBERS.forEach((n,i)=>S.accounts.push({id:"local"+i,name:n,role:null,hasPin:false,loginCount:0})); }
+function handleWriteErr(e){
+  if(e&&e.status===401){ toast("로그인이 끝났어요. 다시 로그인해 주세요"); S.account=null; nav.reset("login"); }
+  else toast(e&&e.message?e.message:"저장하지 못했어요");
+}
+function setMe(me){ S.account=me; S.role=me.role; S.sessionId=me.sessionId; S.sessionStart=me.sessionStart; if(me.limit) S.limit=me.limit; const i=S.accounts.findIndex(a=>a.id===me.id); if(i>=0) S.accounts[i]=me; else S.accounts.push(me); }
+async function apiLogin(a,pin){ // 서버에서 비밀번호 확인
+  if(!S.online){ a.loginCount=(a.loginCount||0)+1; a.lastLoginAt=new Date().toISOString(); a.online=true; setMe({...a,sessionStart:new Date().toISOString()}); return true; }
+  const d=await api("login",{method:"POST",body:{accountId:a.id,pin}}); setMe(d.me); poll(); return true;
+}
+async function apiSetPin(a,role,pin){
+  if(!S.online){ Object.assign(a,{role,hasPin:true,pin}); return apiLogin(a,pin); }
+  const d=await api("pin",{method:"POST",body:{accountId:a.id,role,pin}}); setMe(d.me); poll(); return true;
+}
+async function apiCreate(name,role,pin){
+  if(!S.online){ const a={id:"local"+Date.now(),name,role,hasPin:true,pin,loginCount:0}; S.accounts.push(a); return apiLogin(a,pin); }
+  const d=await api("accounts",{method:"POST",body:{name,role,pin}}); setMe(d.me); poll(); return true;
+}
+async function logout(){
+  if(S.online){ try{ const r=await api("logout",{method:"POST"}); }catch(e){} }
+  else if(S.account){ const a=S.accounts.find(x=>x.id===S.account.id); if(a){a.online=false;a.lastLogoutAt=new Date().toISOString();} }
+  S.account=null; S.role=null; S.sessionId=null; S.sessionStart=null; S.lastPlan=null; S.agreed={}; S.method={}; S.special={};
+  closeSheet(); nav.reset("login"); toast(S.online?"로그아웃 기록을 남겼어요":"로그아웃했어요"); poll();
+}
+async function mySessions(){ if(!S.online) return []; try{ return (await api("sessions")).list; }catch(e){ return []; } }
+function initial(n){ return esc((n||"?").trim().slice(-2)); }
+function avatarHTML(a,size=56){ const c=["#2F6BEA","#0B8A5C","#C25A00","#7B4FD6","#D63B6B","#2E8FA8"]; let h=0; for(const ch of (a?.name||"")) h=(h+ch.charCodeAt(0))%c.length;
+  return `<span style="width:${size}px;height:${size}px;border-radius:50%;background:${c[h]};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:${Math.round(size*.34)}px;flex:0 0 ${size}px">${initial(a?.name)}</span>`; }
+function accName(id){ return S.accounts.find(a=>a.id===id)?.name||"팀원"; }
+async function openProfile(){
+  const a=S.account||{}; const ss=await mySessions();
+  openSheet(`<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+      ${avatarHTML(a)}<div><div style="font-weight:800;font-size:18px">${esc(a.name)}</div><div class="small">${esc(a.role||"")} · ${TEAM}</div></div></div>
+    <div class="stats" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+      <div class="stat"><div class="v">${(a.loginCount||0)}</div><div class="l">총 접속</div><div class="d">첫 접속 ${when(a.firstLoginAt||S.sessionStart)}</div></div>
+      <div class="stat"><div class="v" style="font-size:17px;padding-top:6px">${when(S.sessionStart)}</div><div class="l">이번 로그인</div><div class="d">지금 사용 중</div></div></div>
+    ${S.online?`<div class="sec" style="margin-top:4px">내 접속 기록 (최근 10회)</div>
+      <div style="max-height:180px;overflow-y:auto">${ss.map(s=>`<div class="row" style="padding:9px 0"><div class="grow"><div class="t" style="font-size:14px">${when(s.loginAt)} 로그인</div><div class="s">${s.logoutAt?`${when(s.logoutAt)} 로그아웃 · ${s.durationMin}분`:(s.id===S.sessionId?"사용 중":"로그아웃 기록 없음 (창을 닫음)")} · ${esc(s.device||"")}</div></div></div>`).join("")||`<div class="small">기록이 없어요</div>`}</div>`
+      :`<div class="banner">서버에 연결되지 않아 접속 기록이 저장되지 않아요</div>`}
+    <div style="display:flex;gap:8px;margin-top:14px"><button class="btn sub" data-sheetgo="records">팀 기록 보기</button><button class="btn" style="background:var(--ink)" data-logout>로그아웃</button></div>`);
+}
+async function saveDataset(note){
+  if(!S.online) return;
+  try{ await api("dataset",{method:"PUT",body:{start:S.dataset.start,series:S.dataset.series,orders:S.dataset.orders,note}}); poll(); }catch(e){ handleWriteErr(e); }
+}
+let limitT;
+function saveLimit(){ if(!S.online||!S.account) return; clearTimeout(limitT); limitT=setTimeout(()=>api("me",{method:"PATCH",body:{limit:S.limit}}).catch(()=>{}),700); }
+async function savePlan(A){
+  const items=A.map(a=>({ model:a.name, method:METHODS[a.key].name, forecast:Math.round(a.future[0]), mape:+a.r.mape.toFixed(1),
+    status:a.exception?"협의 확정":"자동 확정", qty:a.exception?+(S.agreed[a.name]?.qty??Math.round(a.future[0])):Math.round(a.future[0]),
+    memo:a.exception?(S.agreed[a.name]?.memo||""):"", reason:a.why.join(", ") }));
+  const plan={ month:planMonth(), limit:S.limit, items, total:items.reduce((s,i)=>s+i.qty,0),
+    auto:items.filter(i=>i.status==="자동 확정").length, exceptions:items.filter(i=>i.status!=="자동 확정").length,
+    confirmedBy:S.account?.id||null, confirmedAt:new Date().toISOString() };
+  S.lastPlan=plan;
+  if(!S.online) return plan;
+  try{ const d=await api("plans",{method:"POST",body:{plan}}); S.lastPlan=d.plan; poll(); }catch(e){ handleWriteErr(e); }
+  return plan;
+}
+async function names(ids){
+  const out={};
+  if(user && ids.length){ try{ const ps=await user.profiles([...new Set(ids)]); for(const k in ps) out[k]=ps[k].name||"팀원"; }catch(e){} }
+  return out;
+}
+
+/* =========================================================
+   4. 수요예측 엔진
+   ========================================================= */
+const METHODS={
+  ma3:{name:"3개월 이동평균",short:"이동평균",desc:"최근 3개월 평균",min:3,run(y,h){const v=(y[y.length-1]+y[y.length-2]+y[y.length-3])/3;return Array(h).fill(v);}},
+  ses:{name:"단순 지수평활",short:"지수평활",desc:"최근 값에 더 큰 비중",min:2,run(y,h){let L=y[0];for(let i=1;i<y.length;i++)L=.4*y[i]+.6*L;return Array(h).fill(L);}},
+  holt:{name:"추세 반영",short:"추세",desc:"증가·감소 추세를 이어감",min:3,run(y,h){let L=y[0],T=y[1]-y[0];for(let i=1;i<y.length;i++){const p=L;L=.5*y[i]+.5*(L+T);T=.3*(L-p)+.7*T;}return Array.from({length:h},(_,k)=>L+(k+1)*T);}},
+  hw:{name:"계절 반영",short:"계절",desc:"추세 + 12개월 계절 패턴",min:13,run(y,h){const m=12;let L=y.slice(0,m).reduce((s,v)=>s+v,0)/m;let T=y.length>=2*m?(y.slice(m,2*m).reduce((s,v)=>s+v,0)/m-L)/m:(y[m]-y[0])/m;const Sn=y.slice(0,m).map(v=>v-L);for(let i=m;i<y.length;i++){const s=Sn[i%m],p=L;L=.3*(y[i]-s)+.7*(L+T);T=.1*(L-p)+.9*T;Sn[i%m]=.3*(y[i]-L)+.7*s;}const n=y.length;return Array.from({length:h},(_,k)=>L+(k+1)*T+Sn[(n+k)%m]);}}
+};
+const BT=6,H=3;
+function backtest(y,k){const M=METHODS[k],fc=[],e=[],ape=[];for(let t=y.length-BT;t<y.length;t++){if(t<M.min){fc.push(null);continue;}const f=M.run(y.slice(0,t),1)[0];fc.push(f);e.push(y[t]-f);ape.push(Math.abs(y[t]-f)/y[t]*100);}return{fc,mape:ape.reduce((s,v)=>s+v,0)/ape.length,sd:Math.sqrt(e.reduce((s,v)=>s+v*v,0)/e.length)};}
+function analyze(name){
+  const y=S.dataset.series[name].map(Number);
+  const res={}; for(const k in METHODS) if(y.length>=METHODS[k].min+BT) res[k]=backtest(y,k);
+  const best=Object.keys(res).reduce((a,k)=>(a==null||res[k].mape<res[a].mape)?k:a,null);
+  const key=(S.method[name]&&res[S.method[name]])?S.method[name]:best;
+  const future=METHODS[key].run(y,H), r=res[key];
+  const band=future.map((f,k)=>[Math.max(0,f-1.96*r.sd*Math.sqrt(k+1)),f+1.96*r.sd*Math.sqrt(k+1)]);
+  const why=[]; if(r.mape>S.limit) why.push(`최근 오차 ${p1(r.mape)}가 기준 ±${S.limit}%보다 커요`); if(S.special[name]) why.push("특이 상황으로 표시했어요");
+  return {name,y,res,best,key,future,band,r,why,exception:why.length>0};
+}
+function analyzeAll(){ return Object.keys(S.dataset.series).map(analyze); }
+function issues(){
+  const seen=new Set(),dups=[],missing=[];
+  S.dataset.orders.forEach((o,i)=>{ if(seen.has(o.no)) dups.push(i); else seen.add(o.no); if(!o.model) missing.push(i); });
+  const gaps=[]; for(const k in S.dataset.series) S.dataset.series[k].forEach((v,i)=>{ if(v==null||v==="") gaps.push({model:k,i}); });
+  return {dups,missing,gaps};
+}
+
+/* =========================================================
+   5. 화면 정의 (기획서 5장 + 데모 + 기록 + 서버)
+   ========================================================= */
+const CH = ["현상인식","문제제기","목적","전략","기대효과"];
+const ICON = {
+  back:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  home:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-4.5v-6h-5v6H5a1 1 0 01-1-1v-9.5z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg>',
+  check:'<svg width="40" height="40" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+
+const SCREENS = {
+/* ---------- 로그인 ---------- */
+splash:{ noBar:true, html:()=>`<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+    <div class="ic" style="width:64px;height:64px;border-radius:20px;font-size:26px">S</div>
+    <h1 style="margin-top:18px">SCM 수요예측 도우미</h1><p class="lead">계정을 확인하고 있어요</p><div class="spin" style="margin-top:4px"></div></div>` },
+
+login:{ noBar:true, html:()=>{
+    const list=[...S.accounts].sort((a,b)=>{ const ia=TEAM_MEMBERS.indexOf(a.name), ib=TEAM_MEMBERS.indexOf(b.name); return (ia<0?99:ia)-(ib<0?99:ib)||(a.name||"").localeCompare(b.name||""); });
+    return `<div style="padding-top:36px">
+      <div class="eyebrow">${TEAM} · SCM 수요예측 도우미</div>
+      <h1>누구로<br>로그인할까요?</h1>
+      <p class="lead">${S.online?"내 이름을 누르고 비밀번호 4자리를 입력하세요. 접속 기록이 팀 서버에 남아요.":"서버에 연결되지 않아 둘러보기 모드예요. 저장되지 않아요."}</p>
+      ${list.map(a=>`<button class="role" data-acc="${a.id}" style="padding:12px 14px">${avatarHTML(a,44)}<span style="flex:1"><b>${esc(a.name)}</b><br><span class="small">${a.hasPin?`${esc(a.role||"")} · 접속 ${a.loginCount||0}회`:"처음이에요 · 비밀번호를 정해요"}</span></span>${a.online?'<span class="pill ok">접속 중</span>':'<span class="chev">›</span>'}</button>`).join("")}
+      <button class="role" data-go="signup" style="justify-content:center;color:var(--pri);font-weight:800;border-style:dashed">+ 새 계정 만들기</button>
+    </div>`; } },
+
+pin:{ title:"", noHome:true, html:()=>{
+    const a=S.pinFor, first=!a.hasPin, needRole=first&&!S.pinRole;
+    if(needRole) return `<div class="eyebrow">${esc(a.name)}님, 처음 오셨네요</div><h1>어느 팀에서<br>쓰시나요?</h1><p class="lead">소속은 기록과 화면에 함께 표시돼요.</p>
+      ${ROLES.map(r=>`<button class="role" data-pinrole="${r}"><span class="r"></span><span><b>${r}</b></span></button>`).join("")}`;
+    const title = first ? (S.pinStage==="confirm"?"한 번 더 입력해 주세요":"비밀번호 4자리를<br>정해 주세요") : `${esc(a.name)}님,<br>비밀번호를 입력하세요`;
+    return `<div style="text-align:center;padding-top:10px">${avatarHTML(a,64)}
+      <h1 style="margin-top:16px">${title}</h1>
+      <p class="lead" id="pinMsg" style="min-height:22px;${S.pinErr?'color:var(--bad)':''}">${esc(S.pinErr||(first?"다른 사람이 내 이름으로 들어오지 못하게 해요":`${esc(a.role||"")}`))}</p>
+      <div style="display:flex;justify-content:center;gap:14px;margin:6px 0 26px">${[0,1,2,3].map(i=>`<span style="width:16px;height:16px;border-radius:50%;background:${i<S.pin.length?'var(--pri)':'var(--line)'};transition:background .15s"></span>`).join("")}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:300px;margin:0 auto">
+        ${[1,2,3,4,5,6,7,8,9,"",0,"←"].map(k=>k===""?"<span></span>":`<button class="iconbtn" data-key="${k}" style="width:100%;height:60px;font-size:24px;font-weight:700">${k}</button>`).join("")}
+      </div></div>`; } },
+
+signup:{ title:"계정 만들기", noHome:true, html:()=>`<h1>새 계정을<br>만들게요</h1><p class="lead">이름과 소속을 넣고, 다음 화면에서 비밀번호 4자리를 정해요.</p>
+    <div class="sec" style="margin-top:0">이름</div>
+    <input class="field" id="suName" maxlength="20" placeholder="예: 홍길동" value="${esc(S.suName||"")}">
+    <div class="sec">소속</div>
+    ${ROLES.map(r=>`<button class="role ${S.suRole===r?'on':''}" data-surole="${r}"><span class="r"></span><span><b>${r}</b></span></button>`).join("")}`,
+  cta:()=>({label:"다음", go:()=>{ const n=($("suName")?.value||"").trim(); S.suName=n;
+      if(!n) return toast("이름을 입력해 주세요"); if(!S.suRole) return toast("소속을 골라 주세요");
+      if(S.accounts.some(a=>a.name===n)) return toast("같은 이름의 계정이 있어요. 목록에서 골라 주세요");
+      S.pinFor={id:null,name:n,role:S.suRole,hasPin:false,isNew:true}; S.pinRole=S.suRole; S.pin=""; S.pinStage="set"; S.pinErr=""; nav.push("pin"); }}) },
+
+/* ---------- 홈 ---------- */
+home:{ title:"", right:"records", html:()=>{
+    const last=S.plans[0];
+    return `<div class="eyebrow">${esc(S.role||"")} · ${TEAM}</div>
+      <h1>${esc(S.account?.name||"팀원")}님,<br>${planMonthKo()} 수요계획을 시작해요</h1>
+      ${!S.online?`<div class="banner">둘러보기 모드 · 서버에 저장되지 않아요</div>`:""}
+      <div class="hero"><div class="k">TO-BE 수요계획</div><div class="h">데이터는 미리 모으고,<br>예외만 사람이 봐요</div><button data-go="merge">${planMonthKo()} 예측 바로 하기</button></div>
+      <div class="sec">기획서</div>
+      <button class="tapcard" data-go="asis"><div class="ic">1</div><div class="grow" style="flex:1"><b>기획서 처음부터 보기</b><div class="small">현상인식 → 문제제기 → 목적 → 전략 → 기대효과</div></div><span class="chev">›</span></button>
+      <div class="sec">최근 기록</div>
+      ${last?`<button class="tapcard" data-go="records"><div class="ic g">✓</div><div style="flex:1"><b>${last.month.replace("-",".")} 계획 확정</b><div class="small">${fmt(last.total)}대 · 자동 ${last.auto} · 협의 ${last.exceptions}</div></div><span class="chev">›</span></button>`
+            :`<div class="card small">아직 확정한 계획이 없어요.</div>`}
+      <button class="tapcard" data-go="server"><div class="ic k">DB</div><div style="flex:1"><b>서버 구조 보기</b><div class="small">로그인·데이터가 어디에 저장되는지</div></div><span class="chev">›</span></button>`; } },
+
+/* ---------- 현상인식 ---------- */
+asis:{ ch:0, html:()=>`<div class="eyebrow">현상인식 · 지금 이 일은 어떻게 돌아가나</div>
+    <h1>수요계획은 <em>8단계</em>를 지나며<br>같은 데이터를 여러 번 모으고,<br>합의·승인에서 멈춰요</h1>
+    <div class="stats" style="margin:18px 0 6px">
+      <div class="stat"><div class="v">8</div><div class="l">단계</div><div class="d">수집부터 생산·납기 연계까지</div></div>
+      <div class="stat"><div class="v">3</div><div class="l">관여 부서</div><div class="d">SCM·영업·생산기획</div></div>
+      <div class="stat"><div class="v" style="color:var(--warn)">1</div><div class="l">대기 지점</div><div class="d">6단계 합의·승인 회의</div></div>
+    </div>
+    <div class="sec">AS-IS 현행 흐름</div>
+    <ul class="steps">${[["판매실적·딜러주문 수집","데이터 출처 분산, 개별 수집",1],["수주예측 수행","수집 자료의 전처리·반복 가공",1],["실제수주 집계","예측·수주 자료 간 연결 필요"],["예측-실제수주 비교·정확도 분석","오차 분석과 보고서 작성의 중복",1],["오차 검토·예측 수정","유사 분석을 다시 하는 재작업",1],["관련 부서 합의 및 승인","회의·승인 대기",1],["판매계획 확정","확정 전 최종 자료 정리"],["생산·납기계획으로 연계","부서 간 정보 공유·실행 연결"]]
+      .map((s,i)=>`<li class="${s[2]?'hot':''}"><b>${i+1}</b><div><div class="t">${s[0]}</div><div class="s">${s[1]}</div></div></li>`).join("")}</ul>
+    <div class="src">출처: (흐름도에서 셈) 팀 AS-IS 흐름표 · SCM 학습 및 개선 기획 기록, 현대 HINT, 2026.11.05, 2쪽</div>`,
+  cta:()=>({label:"다음",go:"waste"}) },
+
+/* ---------- 문제제기 ---------- */
+waste:{ ch:1, html:()=>`<div class="eyebrow">문제제기 · 그중 무엇이 문제인가</div>
+    <h1>가장 큰 낭비는<br><em>중복 입력</em>이에요</h1>
+    <p class="lead">흩어진 판매·딜러 데이터를 따로 모아 다시 가공하는 일이 뒤 단계 재작업까지 만들어요.</p>
+    ${[["1위","중복 입력","1~2단계 수집 → 전처리","출처가 흩어져 개별 수집·반복 가공 (흐름도 관찰, 근1)","효과가 크고 바로 손댈 수 있어 '빨리 하기'","pri"],
+       ["2위","재작업","4~5단계 오차 분석 → 예측 수정","보고서 중복, 유사 분석 재수행 (흐름도 관찰)","영향이 크지만 구조를 바꿔야 해 '계획해서 하기'","k"],
+       ["3위","승인 대기","6단계 SCM → 영업·생산기획","합의 회의에서 멈춤 · 가설: 일반 건도 회의를 거침","통제 기능이 있어 '미루기'","k"]]
+      .map(w=>`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">${w[0]} ${w[1]}</b><span class="pill ${w[5]}">${w[2]}</span></div><div class="small" style="margin-top:6px">${w[3]}</div><div class="small" style="margin-top:2px;color:var(--ink)">→ ${w[4]}</div></div>`).join("")}
+    <div class="sec">효과 × 실행 용이성으로 정한 순서</div>
+    <div class="matrix">
+      <div><b>계획해서 하기</b>재작업·불량·재고·과잉생산</div><div class="hot"><b>빨리 하기</b>중복 입력</div>
+      <div><b>미루기</b>승인 대기</div><div><b>틈날 때 하기</b>운반</div>
+    </div>
+    <div class="small mute" style="display:flex;justify-content:space-between;margin-top:6px"><span>↑ 효과</span><span>실행 용이성 →</span></div>
+    <div class="src">출처: (흐름도에서 셈) AS-IS 1~6단계 관찰 지점 · 근1 · (가정: 일반 건도 매번 합의 회의를 거친다) · 팀 우선순위 표, 2026.11.05</div>`,
+  cta:()=>({label:"다음",go:"evidence"}) },
+
+evidence:{ ch:1, html:()=>`<div class="eyebrow">문제제기 · 왜 문제라고 믿는가</div>
+    <h1>공급망 데이터는 해마다<br>더 넓게 모으고 검증해야 해요</h1>
+    <p class="lead">그래서 같은 자료를 단계마다 다시 모으는 지금 방식은 부담이 그만큼 커져요.</p>
+    <div class="card"><span class="pill pri">근1</span>
+      <div class="quote" style="margin-top:10px">“국내외 1차 협력사뿐만 아니라 2차 이상 중점관리 협력사를 대상으로 매년 서면 평가를 실시하고 리스크를 관리합니다”</div>
+      <div class="small">현대자동차 공급망 지속가능성 관리정책, 2026.09.09 · 4. 공급망 ESG 실사 프로세스</div>
+      <div class="small" style="color:var(--ink);margin-top:6px">→ 협력사 데이터까지 매년 모아요. 수집 창구가 흩어져 있으면 1~2단계 중복 입력이 커져요.</div></div>
+    <div class="card"><span class="pill pri">근2</span>
+      <div class="quote" style="margin-top:10px">“공급망 전반에 걸쳐 원산지 및 추적성 확보를 위해 노력하며 … 필요에 따라 공급망 실사 및 조달 관행에 대한 독립적인 제3자 감시를 진행하고 …”</div>
+      <div class="small">같은 문서 · 책임있는 원부자재 조달 정책(2026)</div>
+      <div class="small" style="color:var(--ink);margin-top:6px">→ 추적성·검증 요구가 있어요. 통합 검증과 '수집 시점·검증 이력'이 필요한 이유예요.</div></div>
+    <div class="sec">우리 흐름도에서 본 것</div>
+    <div class="chips">${["반복 가공 · 2단계","중복 보고 · 4단계","재분석 · 5단계","회의·승인 대기 · 6단계"].map(c=>`<span class="chip">${c}</span>`).join("")}</div>
+    <div class="src">근1·근2는 회사 공급망 정책 문서로, 수요계획 업무 시간을 직접 잰 자료는 아니에요. 실제 중복 수집 시간은 현업 확인 전이에요.</div>`,
+  cta:()=>({label:"다음",go:"goal"}) },
+
+/* ---------- 목적 ---------- */
+goal:{ ch:2, html:()=>`<div class="eyebrow">목적 · 무엇을 어디까지 바꾸나</div>
+    <h1>일반 건은<br><em>회의 없이 확정</em>해요</h1>
+    <div class="card" style="margin-top:14px">
+      ${[["누가","SCM 수요계획팀 담당자 (영업·생산기획과 협업)"],["어떤 상황에서","판매실적·딜러주문으로 수요를 예측하고 실제 수주와 맞춰 판매계획을 확정할 때"],["무엇 때문에","출처가 흩어져 개별 수집하고, 오차 분석·수정을 반복하며, 모든 건이 합의 회의를 거쳐서"],["어떤 손실","중복 입력·재작업 공수가 늘고, 승인 대기로 계획 확정과 생산·납기 연계가 늦어짐"]]
+        .map(r=>`<div class="row" style="align-items:flex-start"><div style="width:84px;flex:0 0 84px" class="small"><b>${r[0]}</b></div><div class="grow small" style="color:var(--ink)">${r[1]}</div></div>`).join("")}
+    </div>
+    <div class="card" style="background:var(--pri-pale)"><b style="color:var(--pri)">목표</b><div style="margin-top:4px;font-size:14.5px">통합 데이터로 예측·오차 분석을 한 흐름으로 처리하고, 기준 안의 일반 건은 회의 없이 확정 · 예외 건만 부서 협의</div></div>
+    <div class="sec">범위</div>
+    <div class="card small"><b style="color:var(--ink)">바꾸는 곳</b> 판매·딜러 데이터 수집 → 예측 → 오차 분석 → 계획 확정·공유<br><b style="color:var(--ink)">제외</b> 생산·납기계획 수립 자체 (결과를 넘겨주는 데까지)</div>
+    <div class="sec">무엇으로 판단하나</div>
+    <div class="stats" style="grid-template-columns:1fr 1fr">${[["리드타임","수립·승인 소요시간"],["정확도","예측 정확도, 오차율"],["재작업","수정 횟수, 리포트 공수"],["적용성","예외 협의 건수, 회의 횟수"]].map(s=>`<div class="stat"><div class="l" style="margin:0;font-size:14px">${s[0]}</div><div class="d">${s[1]}</div></div>`).join("")}</div>
+    <div class="src">출처: SCM 학습 및 개선 기획 기록, 현대 HINT, 2026.11.05, 2·5쪽 (개선안 선정 기준)</div>`,
+  cta:()=>({label:"다음",go:"ecrs"}) },
+
+/* ---------- 전략 ---------- */
+ecrs:{ ch:3, html:()=>`<div class="eyebrow">전략 ① · 어떻게 바꾸나</div>
+    <h1>합치고, 없애고,<br>회의는 <em>예외만</em> 남겨요</h1>
+    ${[["C·R","판매·딜러 데이터 수집","수집과 예측을 통합하고, 예측 전에 수집을 먼저 끝내요 (수작업 → 자동 수집·검증)","1위 낭비를 직접 줄여요"],
+       ["E·C","오차 원인 검토·수정","영업 별도 확인 없이 SCM이 원인 분석, 분석과 수정을 한 과정으로","4·5단계 재작업을 한 번으로"],
+       ["S·E","부서 간 합의 회의","기준 안의 결과는 바로 다음 단계로, 적정 범위면 회의 없이 확정","통제는 두고 대기만 줄여요"],
+       ["E","불필요 자료·작업","반복 분석 리포트를 없애고 핵심 지표만 남겨요","보고서 중복 제거"]]
+      .map(e=>`<div class="row" style="align-items:flex-start"><div class="ic">${e[0]}</div><div class="grow"><div class="t">${e[1]}</div><div class="s">${e[2]}</div><div class="s" style="color:var(--pri);font-weight:700">${e[3]}</div></div></div>`).join("")}
+    <div class="sec">TO-BE 흐름</div>
+    <div class="flow">
+      <div class="n"><b>① 입력·통합</b><div class="s">판매실적·딜러주문 수집·통합 검증</div></div><div class="ar">▼</div>
+      <div class="d">◇ 판단 A · 기준 안에서 처리 가능한가?</div><div class="ar">▼ 아니면 ③ 수정·재검토</div>
+      <div class="n"><b>② 수요예측</b><div class="s">예측과 오차 분석을 한 흐름으로</div></div><div class="ar">▼</div>
+      <div class="n"><b>④ 계획 초안</b><div class="s">판매계획·생산·납기 조정의 근거</div></div><div class="ar">▼</div>
+      <div class="d">◇ 판단 B · 예외·부서 협의가 필요한가?</div><div class="ar">▼</div>
+      <div class="n"><b>⑤ 확정·공유</b><div class="s">일반 건은 바로, 예외 건은 협의 후</div></div>
+    </div>
+    <div class="src">출처: ECRS 적용표 · TO-BE 흐름도 시안, SCM 학습 및 개선 기획 기록 3~4쪽, 14쪽</div>`,
+  cta:()=>({label:"다음",go:"ai"}) },
+
+ai:{ ch:3, html:()=>`<div class="eyebrow">전략 ② · 데이터·AI가 들어가는 자리</div>
+    <h1>AI는 <em>예측·오차 분석</em>에,<br>승인은 규칙으로 자동화해요</h1>
+    <div class="ladder" style="margin-top:16px">
+      <div><b>① 기록하기</b><span>흩어진 판매·딜러 데이터를 한 양식으로 · 핵심 지표 자동 리포트</span></div>
+      <div style="margin-left:14px"><b>② 보이게 하기</b><span>통합 대시보드로 수주·예측을 한눈에</span></div>
+      <div class="hot" style="margin-left:28px"><b style="color:var(--warn)">③ 예측하기 · AI 자리</b><span>수요예측 + 오차 원인 분석</span></div>
+      <div style="margin-left:42px"><b>④ 자동으로 맞추기</b><span>기준 안이면 자동 확정 (AI 없이 규칙)</span></div>
+    </div>
+    <div class="sec">필요한 데이터</div>
+    ${[["통합 대시보드","판매실적 · 딜러 주문 · 수집 시점·검증 이력","일부"],["AI 오차 원인 분석","예측값 · 실제 수주량 · 오차·수정 이력","일부"],["기준 기반 자동 승인","승인 기준 · 예측 정확도 · 적정 범위·승인 이력","미확인"],["핵심 지표 자동 리포트","리포트 항목 · 활용 빈도 · 분석 기록","일부"]]
+      .map(d=>`<div class="row"><div class="grow"><div class="t" style="font-size:14px">${d[0]}</div><div class="s">${d[1]}</div></div><span class="pill ${d[2]==='미확인'?'warn':'k'}">${d[2]}</span></div>`).join("")}
+    <div class="card" style="margin-top:14px;background:var(--pri-pale)"><b style="color:var(--pri)">이제 직접 해볼게요</b><div class="small" style="color:var(--ink)">다음 화면부터 TO-BE 흐름대로 ${planMonthKo()} 수요예측을 실제로 돌려요. 결과는 팀 서버에 저장돼요.</div></div>
+    <div class="src">출처: ECRS 개선 아이디어 상세 시안, 기록 6쪽 · '지금 있나'는 팀 판단 (가정: 현업 확인 전)</div>`,
+  cta:()=>({label:"직접 해보기",go:"merge"}) },
+
+/* ---------- 데모: ① 입력·통합 ---------- */
+merge:{ ch:3, title:"① 입력·통합", html:()=>{
+    const is=issues(), n=Object.keys(S.dataset.series).length;
+    return `<h1>판매·딜러 데이터를<br>하나로 모았어요</h1>
+      <p class="lead">${S.datasetFromServer?`서버의 최신 데이터예요${S.lastSaved?.at?` · ${when(S.lastSaved.at)} 저장`:""}`:"예시 데이터로 시작해요 (가상의 숫자)"}</p>
+      <div id="mergeChecks">
+        ${[["판매실적",`${n}개 차종 · ${nLen()}개월`,"done"],["딜러주문",`${S.dataset.orders.length}건 접수`,"done"],["중복 주문 제외",`같은 주문번호 ${is.dups.length}건을 합계에서 뺐어요`,"done"],
+           ["확인 필요",(is.gaps.length+is.missing.length)?`빈 값 ${is.gaps.length}칸 · 차종 누락 ${is.missing.length}건`:"없어요",(is.gaps.length+is.missing.length)?"warn":"done"]]
+          .map((c,i)=>`<div class="check" data-i="${i}"><div class="dot">${c[2]==="warn"?"!":"✓"}</div><div><div class="t">${c[0]}</div><div class="s">${c[1]}</div></div></div>`).join("")}
+      </div>
+      <div class="card small" style="margin-top:14px">E·C·R·S 중 <b style="color:var(--ink)">C 합치기 · R 바꾸기</b> — 담당자가 따로 모으던 자료를 한 번에 받고, 중복은 기계가 걸러요.</div>`; },
+  mount:el=>{ const is=issues(); el.querySelectorAll(".check").forEach((c,i)=>setTimeout(()=>c.classList.add(i===3&&(is.gaps.length+is.missing.length)?"warn":"done"),250+i*260)); },
+  cta:()=>{ const is=issues(); return {label:(is.gaps.length+is.missing.length)?"확인하러 가기":"예측하기", go:(is.gaps.length+is.missing.length)?"fix":"loading"}; } },
+
+/* ---------- 데모: 판단 A / ③ 수정 ---------- */
+fix:{ ch:3, title:"◇ 판단 A", html:()=>{
+    const is=issues(); const total=is.gaps.length+is.missing.length;
+    if(!total) return `<h1>모두 기준 안이에요</h1><p class="lead">데이터 품질과 필수 항목을 통과했어요. 예측으로 넘어갈게요.</p><div class="donecheck" style="width:64px;height:64px">${ICON.check}</div>`;
+    return `<h1>${total}개만 확인하면<br>예측할 수 있어요</h1>
+      <p class="lead">기준을 못 맞춘 건만 모았어요. 오류 데이터가 그대로 통과하지 않게 해요.</p>
+      ${is.gaps.map(g=>{ const s=S.dataset.series[g.model]; const prev=s.slice(0,g.i).reverse().find(v=>v!=null), next=s.slice(g.i+1).find(v=>v!=null); const guess=Math.round(((prev??next)+(next??prev))/2);
+        return `<div class="card"><span class="pill warn">빈 값</span><div style="font-weight:800;font-size:17px;margin:8px 0 2px">${g.model} · ${mLabel(g.i)} 판매실적</div>
+          <div class="small">앞뒤 달 평균으로 채우면 <b style="color:var(--ink)">${fmt(guess)}대</b> (추정치)</div>
+          <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="height:44px;font-size:14.5px" data-fill="${g.model}|${g.i}|${guess}">추정치로 채우기</button><button class="btn sub" style="height:44px;font-size:14.5px" data-input="${g.model}|${g.i}">직접 입력</button></div></div>`; }).join("")}
+      ${is.missing.map(i=>{ const o=S.dataset.orders[i]; return `<div class="card"><span class="pill warn">차종 누락</span><div style="font-weight:800;font-size:17px;margin:8px 0 2px">딜러주문 ${o.no}</div><div class="small">${o.dealer} · ${o.qty}대 · 차종을 골라 주세요</div>
+          <div class="chips" style="margin-top:12px">${Object.keys(S.dataset.series).map(k=>`<button class="chip" data-assign="${i}|${k}">${k}</button>`).join("")}<button class="chip" data-assign="${i}|__drop">주문 제외</button></div></div>`; }).join("")}`; },
+  cta:()=>{ const is=issues(); const ok=!(is.gaps.length+is.missing.length); return {label:ok?"예측하기":"모두 확인하면 다음으로", disabled:!ok, go:"loading"}; } },
+
+/* ---------- 데모: ② 예측 중 ---------- */
+loading:{ ch:3, title:"② 수요예측", noBack:true, html:()=>`<div style="text-align:center"><div class="spin"></div><h1>4가지 방법으로<br>예측해 보고 있어요</h1>
+    <p class="lead">지난 6개월을 모른다고 치고 미리 맞혀 본 뒤,<br>차종마다 가장 잘 맞은 방법을 골라요.</p>
+    <div class="card" style="text-align:left" id="ldList">${Object.values(METHODS).map(m=>`<div class="check"><div class="dot">✓</div><div><div class="t">${m.name}</div><div class="s">${m.desc}</div></div></div>`).join("")}</div></div>`,
+  mount:el=>{ el.querySelectorAll("#ldList .check").forEach((c,i)=>setTimeout(()=>c.classList.add("done"),300+i*330)); setTimeout(()=>{ if(nav.cur()==="loading") nav.replace("result"); },1900); },
+  cta:()=>null },
+
+/* ---------- 데모: 예측 결과 ---------- */
+result:{ ch:3, title:"② 수요예측", html:()=>{
+    const A=analyzeAll(); const sum=A.reduce((s,a)=>s+a.future[0],0); const ex=A.filter(a=>a.exception);
+    return `<div class="eyebrow">${planMonthKo()} 예측 합계</div>
+      <div class="big num">${fmt(sum)}<small>대</small></div>
+      <p class="lead" style="margin-top:8px">${A.length}개 차종 중 <b style="color:var(--ink)">${A.length-ex.length}개는 바로 확정</b>할 수 있어요.${ex.length?` ${ex.length}개만 같이 확인해요.`:""}</p>
+      <button class="chip" data-sheet="limit" style="margin-bottom:6px">자동 확정 기준 · 오차 ±${S.limit}% ›</button>
+      <div style="margin-top:8px">${A.map(a=>`<button class="mrow" data-model="${esc(a.name)}">
+          <div class="ic ${a.exception?'o':'g'}">${a.exception?'!':'✓'}</div>
+          <div style="flex:1;min-width:0"><div class="nm">${esc(a.name)}</div><div class="sb">${METHODS[a.key].name} · 오차 ${p1(a.r.mape)}</div></div>
+          <div><div class="val num">${fmt(a.future[0])}대</div><div style="text-align:right"><span class="pill ${a.exception?'warn':'ok'}">${a.exception?'협의':'자동'}</span></div></div></button>`).join("")}</div>
+      <div class="src">오차 = 최근 6개월 백테스트 평균 오차(MAPE). 예측은 통계 방법이며, 기획서의 'AI 자리'를 대신하는 시제품이에요.</div>`; },
+  cta:()=>{ const ex=analyzeAll().filter(a=>a.exception).length; return {label:ex?`예외 ${ex}건 확인하기`:"계획 확정하기", go:ex?"exception":"confirm"}; } },
+
+/* ---------- 데모: 차종 상세 ---------- */
+detail:{ ch:3, title:"차종 상세", html:()=>{
+    const a=analyze(S.selModel);
+    return `<div class="eyebrow">${esc(a.name)}</div>
+      <div class="big num">${fmt(a.future[0])}<small>대</small></div>
+      <div class="small" style="margin:6px 0 14px">${planMonthKo()} 예측 · 예상 범위 ${fmt(a.band[0][0])}~${fmt(a.band[0][1])}대 · <span class="pill ${a.exception?'warn':'ok'}">${a.exception?'협의':'자동 확정'}</span></div>
+      <div class="chartwrap" id="chart">${chartSVG(a)}<div class="ctip" id="ctip"></div></div>
+      <div class="legend"><span><i style="border-color:var(--chartA)"></i>실적</span><span><i style="border-color:var(--chartF);border-top-style:dashed"></i>예측</span><span><i style="border-color:#F3D3AE;border-top-width:7px"></i>예상 범위</span></div>
+      <div class="sec">예측 방법 · 최근 6개월 오차</div>
+      <div class="seg">${Object.keys(a.res).map(k=>`<button class="${k===a.key?'on':''}" data-method="${k}">${METHODS[k].short} ${p1(a.res[k].mape)}${k===a.best?' ★':''}</button>`).join("")}</div>
+      <div class="small" style="margin-top:8px">★ 가장 잘 맞은 방법 · 지금: ${METHODS[a.key].name} (${METHODS[a.key].desc})</div>
+      <div class="sec">앞으로 3개월</div>
+      ${a.future.map((f,k)=>`<div class="row"><div class="grow"><div class="t">${mLabel(a.y.length+k)}</div><div class="s">범위 ${fmt(a.band[k][0])}~${fmt(a.band[k][1])} · 작년 ${fmt(a.y[a.y.length+k-12])}</div></div><b class="num">${fmt(f)}대</b></div>`).join("")}
+      <label class="row" style="cursor:pointer"><div class="grow"><div class="t">특이 상황</div><div class="s">대규모 주문, 공급 제약 등 → 예외로 보내요</div></div><input type="checkbox" data-special="${esc(a.name)}" ${S.special[a.name]?'checked':''} style="width:22px;height:22px;accent-color:var(--pri)"></label>`; },
+  mount:el=>bindChart(el), cta:()=>({label:"확인",go:()=>nav.back()}) },
+
+/* ---------- 데모: 판단 B / 예외 ---------- */
+exception:{ ch:3, title:"◇ 판단 B", html:()=>{
+    const ex=analyzeAll().filter(a=>a.exception);
+    return `<h1>${ex.map(a=>esc(a.name)).join(", ")}만<br>같이 확인하면 돼요</h1>
+      <p class="lead">나머지는 기준 안이라 회의 없이 확정돼요. 영업·생산기획과 정한 수량을 넣어 주세요.</p>
+      ${ex.map(a=>{ const g=S.agreed[a.name]||(S.agreed[a.name]={qty:Math.round(a.future[0]),memo:""});
+        return `<div class="card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:17px">${esc(a.name)}</b><span class="pill warn">협의</span></div>
+          <div class="small" style="margin:4px 0 12px">${a.why.join(" · ")}<br>예측 ${fmt(a.future[0])}대 · 예상 범위 ${fmt(a.band[0][0])}~${fmt(a.band[0][1])}대</div>
+          <div class="stepper"><button data-step="${esc(a.name)}|-10">−</button><input class="num" inputmode="numeric" data-qty="${esc(a.name)}" value="${g.qty}"><button data-step="${esc(a.name)}|10">+</button></div>
+          <div class="chips" style="margin-top:10px">${["영업 확인 완료","생산 여력 반영","프로모션 반영","예측값 유지"].map(m=>`<button class="chip ${g.memo===m?'on':''}" data-memo="${esc(a.name)}|${m}">${m}</button>`).join("")}</div></div>`; }).join("")}`; },
+  cta:()=>({label:"판매계획 확정하기",go:"confirm"}) },
+
+/* ---------- 데모: ⑤ 확정·공유 ---------- */
+confirm:{ ch:3, title:"⑤ 확정·공유", noBack:true, html:()=>{
+    const p=S.lastPlan; if(!p) return `<div class="spin"></div>`;
+    return `<div style="text-align:center"><div class="donecheck">${ICON.check}</div>
+      <h1>${planMonthKo()} 판매계획을<br>확정했어요</h1><p class="lead">${S.online?"팀 서버에 저장했어요. 팀원 누구나 기록에서 볼 수 있어요.":"둘러보기 모드라 저장되지는 않았어요."}</p></div>
+      <div class="stats"><div class="stat"><div class="v">${p.auto}</div><div class="l">자동 확정</div><div class="d">회의 없음</div></div>
+        <div class="stat"><div class="v" style="color:var(--warn)">${p.exceptions}</div><div class="l">협의 확정</div><div class="d">예외만 회의</div></div>
+        <div class="stat"><div class="v" style="font-size:20px;padding-top:6px">${fmt(p.total)}</div><div class="l">합계(대)</div><div class="d">생산·납기로 연계</div></div></div>
+      <div class="card" style="margin-top:12px">${p.items.map(i=>`<div class="row"><div class="grow"><div class="t">${esc(i.model)}</div><div class="s">${i.status}${i.memo?` · ${esc(i.memo)}`:""}</div></div><b class="num">${fmt(i.qty)}대</b></div>`).join("")}</div>
+      <button class="btn sub" style="width:100%;margin-top:12px;flex:none" data-copy>공유 요약 복사</button>`; },
+  enter:async()=>{ const A=analyzeAll(); await savePlan(A); },
+  cta:()=>({label:"기대효과 보기",go:"effect"}) },
+
+/* ---------- 기대효과 ---------- */
+effect:{ ch:4, html:()=>{
+    const p=S.lastPlan||S.plans[0];
+    return `<div class="eyebrow">기대효과 · 그러면 무엇이 달라지나</div>
+      <h1>일반 건은 회의 없이 확정되고,<br>사람은 <em>예외 판단</em>에만 써요</h1>
+      ${p?`<div class="card" style="background:var(--pri-pale);margin:14px 0 4px"><b style="color:var(--pri)">방금 해본 결과</b><div style="font-size:14.5px;margin-top:2px">회의에 올릴 건이 <b>${p.items.length}건 → ${p.exceptions}건</b>으로 줄었어요 (화면에서 셈)</div></div>`:""}
+      <div class="sec">전후 비교</div>
+      <table class="cmp">${[["단계 수","8단계","5단계 + 판단 2개","흐름도에서 셈"],["대기 지점","모든 건 합의·승인","예외 건만 협의","흐름도에서 셈"],["담당","오차 검토를 영업과","SCM이 자체 분석","흐름도에서 셈"],["리드타임","약 7일","약 4일","가정"],["회의","주 3회","주 1회 이하","가정"],["예측 오차율","약 15%","약 10%","가정"]]
+        .map(r=>`<tr><td>${r[0]}</td><td><span class="a">${r[1]}</span><br><span class="b">${r[2]}</span></td><td class="tg">${r[3]}</td></tr>`).join("")}</table>
+      <div class="small" style="margin-top:8px"><b style="color:var(--ink)">늘어나는 일</b> 데이터 통합·검증, 판단 기준 관리, 실적 모니터링</div>
+      <div class="sec">무엇이 줄어드나</div>
+      <div class="chips"><span class="chip">대기 · 회의·의사결정 지연</span><span class="chip">중복 작업 · 반복 분석</span><span class="chip">업무 부담 · 수작업 수집</span></div>
+      <div class="src">리드타임 7→4일, 회의 주3→1회 이하, 오차율 15→10%는 측정 실적이 아닌 예시 목표치(가정)예요. 현업 데이터 확인 후 확정해요.</div>`; },
+  cta:()=>({label:"다음",go:"risk"}) },
+
+risk:{ ch:4, html:()=>`<div class="eyebrow">기대효과 · 무엇이 불확실한가</div>
+    <h1>가장 큰 리스크는<br>효과 숫자가 <em>아직 가정</em>이라는 점</h1>
+    <p class="lead">현업 데이터로 먼저 재고, 수집 양식 통일부터 작게 시작해요.</p>
+    <div class="sec" style="margin-top:6px">가정 → 확인 방법</div>
+    ${[["리드타임 약 7일 → 약 4일","회차별 수립·승인 소요시간 실측"],["회의 주 3회 → 주 1회 이하","회의 기록에서 일반/예외 비율 확인"],["오차율 약 15% → 약 10%","최근 예측값과 실제 수주 비교"],["일반 건도 매번 회의를 거친다","영업·생산기획 담당자 인터뷰"],["판단 기준 (예: 오차 ±X%)","세 팀이 함께 정해 시범 적용"]]
+      .map(r=>`<div class="row"><div class="grow"><div class="t" style="font-size:14px">${r[0]}</div><div class="s">${r[1]}</div></div></div>`).join("")}
+    <div class="card" style="margin-top:12px"><b>실행 저항</b><div class="small">회의 없이 확정되는 데 대한 불안 → 예외 기준을 함께 정하고 판단 B로 통제를 남겨요</div></div>
+    <div class="card"><b>비용</b><div class="small">데이터 자동 연동·검증 구축, 판단 기준 유지·관리 공수</div></div>
+    <div class="card" style="background:var(--warn-pale)"><b style="color:var(--warn)">첫 실행 한 가지</b><div class="small" style="color:var(--ink)">판매실적·딜러주문 수집 양식을 하나로 통일해 중복 입력부터 없애요 ('빨리 하기')</div></div>
+    <div class="src">출처: (가정: 표의 모든 수치) · 개선안 선정 기준·TO-BE 판단 기준, 기록 4~5쪽</div>`,
+  cta:()=>({label:"한 장으로 보기",go:"summary"}) },
+
+summary:{ ch:4, html:()=>`<div class="eyebrow">한 장으로</div>
+    <h1>데이터는 미리 통합하고,<br>반복 검토는 자동화하며,<br><em>예외에만 사람</em>이 개입해요</h1>
+    <ul class="steps" style="margin-top:12px">${[["현상인식","8단계 동안 같은 데이터를 여러 번 모으고 분석한 뒤 합의·승인에서 멈춘다"],["문제제기","가장 큰 낭비는 중복 입력 — 뒤 단계 재작업까지 만든다"],["문제제기","공급망 데이터는 해마다 더 넓게 모으고 검증해야 한다"],["목적","흩어진 데이터 반복 수집·분석으로 확정이 늦다 → 일반 건은 회의 없이 확정"],["전략","수집·예측은 합치고, 반복 분석은 없애고, 회의는 예외 건으로만"],["전략","AI는 예측·오차 분석 자리에, 승인은 규칙 기반 자동화"],["기대효과","일반 건은 회의 없이 확정, 사람은 예외 판단에 집중"],["기대효과","효과 숫자는 가정 — 현업 데이터로 재고 수집 양식 통일부터"]]
+      .map((r,i)=>`<li><b>${i+2}</b><div><div class="s" style="color:var(--pri);font-weight:700">${r[0]}</div><div class="t" style="font-weight:500;font-size:14px">${r[1]}</div></div></li>`).join("")}</ul>
+    <div class="sec">출처</div>
+    <div class="small">근1·근2 현대자동차 공급망 지속가능성 관리정책 (PDF), 2026.09.09<br>흐름도에서 셈 · 우리 팀 AS-IS·TO-BE 흐름도 (SCM 학습 및 개선 기획 기록, 현대 HINT, 2026.11.05)<br>가정 · 리드타임·회의·오차율 목표치는 현업 데이터로 확인 전</div>`,
+  cta:()=>({label:"처음으로",go:()=>nav.reset("home")}) },
+
+/* ---------- 기록 ---------- */
+records:{ title:"기록", html:()=>{
+    if(!S.online) return `<h1>기록</h1><div class="banner">둘러보기 모드라 서버 기록을 볼 수 없어요</div>`;
+    return `<h1>팀 기록</h1><p class="lead">이 앱에서 한 일은 모두 서버에 남아요.</p>
+      <div class="sec">확정한 판매계획</div>
+      ${S.plans.length?S.plans.map(p=>`<div class="row"><div class="ic g">✓</div><div class="grow"><div class="t">${p.month.replace("-",".")} · ${fmt(p.total)}대</div><div class="s">자동 ${p.auto} · 협의 ${p.exceptions} · 기준 ±${p.limit}% · ${esc(accName(p.confirmedBy))} · ${when(p.confirmedAt)}</div></div></div>`).join(""):`<div class="small">아직 없어요</div>`}
+      <div class="sec">팀원 계정 · 로그인 상태</div>
+      ${S.accounts.length?[...S.accounts].sort((a,b)=>(b.lastLoginAt||"").localeCompare(a.lastLoginAt||"")).map(m=>`<div class="row">${avatarHTML(m,40)}<div class="grow"><div class="t">${esc(m.name)}</div><div class="s">${esc(m.role||"소속 미정")} · 접속 ${m.loginCount||0}회${m.lastLoginAt?` · 로그인 ${when(m.lastLoginAt)}`:""}${m.lastLogoutAt?` · 로그아웃 ${when(m.lastLogoutAt)}`:""}</div></div>${m.online?'<span class="pill ok">접속 중</span>':m.lastLoginAt?'<span class="pill k">로그아웃</span>':'<span class="pill k">미접속</span>'}</div>`).join(""):`<div class="small">아직 없어요</div>`}
+      <div class="sec">활동 기록 (최근 40개)</div>
+      <div class="feed">${S.activity.length?S.activity.map(a=>`<div class="row"><div class="ic ${a.type==="plan"?"g":a.type==="data"?"o":"k"}">${a.type==="plan"?"✓":a.type==="data"?"D":a.type==="logout"?"←":a.type==="account"?"+":"→"}</div><div class="grow"><div class="t" style="font-size:14px">${esc(a.text)}</div><div class="s">${esc(accName(a.by))} · ${when(a.at)}</div></div></div>`).join(""):`<div class="small">아직 없어요</div>`}</div>`; },
+  mount:el=>fillNames(el) },
+
+/* ---------- 서버 구조 ---------- */
+server:{ title:"서버 구조", html:()=>`<h1>로그인과 데이터는<br>이렇게 저장돼요</h1>
+    <p class="lead">Vercel에 배포된 서버 함수(API)가 로그인을 확인하고, 데이터는 Vercel Blob 비공개 저장소에 남겨요.</p>
+    <div class="card"><div class="row" style="padding-top:0"><div class="grow"><div class="t">연결 상태</div><div class="s">${S.online?`서버 연결됨 · 저장소 ${esc(S.server?.store||"")}`:"서버에 연결되지 않음 (둘러보기 모드)"}</div></div><span class="pill ${S.online?'ok':'warn'}">${S.online?'ONLINE':'OFFLINE'}</span></div>
+      <div class="row"><div class="grow"><div class="t">로그인</div><div class="s">${S.account?`${esc(S.account.name)} · 세션 ${when(S.sessionStart)} 시작`:"로그인 전"}</div></div></div></div>
+    <div class="sec">API (Vercel Functions)</div>
+    <div class="code">GET   /api/bootstrap   앱 시작 데이터 (내 로그인 상태 포함)
+POST  /api/login       이름 + 비밀번호 → 세션 쿠키 발급
+POST  /api/pin         첫 비밀번호 설정 + 로그인
+POST  /api/accounts    새 계정 만들기 + 로그인
+POST  /api/logout      세션 종료 · 사용 시간 기록
+GET   /api/sessions    내 접속 기록 (최근 10회)
+PATCH /api/me          내 설정 (자동 확정 기준)
+PUT   /api/dataset     판매·딜러 데이터 저장
+POST  /api/plans       판매계획 확정 저장</div>
+    <div class="sec">저장소 (Vercel Blob · 비공개)</div>
+    <div class="code">db/accounts.json   팀원 계정
+  id, name, role, team,
+  salt, hash (scrypt 비밀번호 해시),
+  loginCount, online, firstLoginAt,
+  lastLoginAt, lastLogoutAt,
+  recentLogins[10], limit,
+  fails, lockUntil (5회 오류 잠금)
+
+db/sessions.json   접속 세션 (1회 = 1건)
+  id, tokenHash, accountId, role,
+  loginAt, logoutAt, durationMin, device
+
+db/dataset.json    판매·딜러 데이터
+  start, series{차종:[월별]}, orders[],
+  updatedBy, updatedAt, note
+
+db/plans.json      확정한 판매계획 (월별)
+  month, items[], total, auto,
+  exceptions, limit, confirmedBy, confirmedAt
+
+db/activity.json   활동 기록 (최근 300건)
+  type, text, by, at</div>
+    <div class="sec">보안</div>
+    <div class="row"><div class="grow"><div class="t" style="font-size:14px">비밀번호</div><div class="s">원문은 저장하지 않고 서버에서 scrypt 해시로만 비교 · 5번 틀리면 5분 잠금</div></div></div>
+    <div class="row"><div class="grow"><div class="t" style="font-size:14px">세션</div><div class="s">브라우저에는 HttpOnly 쿠키만, 서버에는 토큰 해시만 저장 · 7일 유지</div></div></div>
+    <div class="row"><div class="grow"><div class="t" style="font-size:14px">쓰기 권한</div><div class="s">데이터 수정·계획 확정은 로그인한 사람만 (서버에서 확인)</div></div></div>
+    <div class="row"><div class="grow"><div class="t" style="font-size:14px">동시 저장</div><div class="s">여러 명이 동시에 저장하면 버전(ETag)을 비교해 자동으로 다시 시도</div></div></div>
+    <div class="src">수업용 시제품이에요. 비밀번호 4자리는 편의를 위한 것이라 실서비스라면 더 긴 비밀번호와 2단계 인증이 필요해요.</div>` }
+};
+
+/* =========================================================
+   6. 차트 (실적 + 백테스트 + 예측 + 범위)
+   ========================================================= */
+function chartSVG(a){
+  const W=342,Hh=190,m={l:38,r:12,t:12,b:24}; const show=12, y=a.y.slice(-show), n=y.length, N=n+H;
+  const bt=a.r.fc; const all=[...y,...a.band.flat(),...bt.filter(v=>v!=null)];
+  let lo=Math.min(...all),hi=Math.max(...all); const pad=(hi-lo)*.12||10; lo-=pad; hi+=pad;
+  const X=i=>m.l+i*(W-m.l-m.r)/(N-1), Y=v=>m.t+(hi-v)/(hi-lo)*(Hh-m.t-m.b);
+  let g=""; const step=niceStep((hi-lo)/4);
+  for(let v=Math.ceil(lo/step)*step; v<=hi; v+=step) g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="#F2F4F6"/><text x="${m.l-6}" y="${Y(v)+4}" text-anchor="end" font-size="10" fill="#8B95A1">${fmt(v)}</text>`;
+  for(let i=0;i<N;i+=3) g+=`<text x="${X(i)}" y="${Hh-6}" text-anchor="middle" font-size="10" fill="#8B95A1">${mLabel(a.y.length-show+i).slice(5)}월</text>`;
+  g+=`<rect x="${X(n-.5)}" y="${m.t}" width="${X(N-1)-X(n-.5)+6}" height="${Hh-m.t-m.b}" fill="#FFF7EE" rx="6"/>`;
+  const bp=[[X(n-1),Y(y[n-1])],...a.band.map((b,k)=>[X(n+k),Y(b[1])]),...a.band.slice().reverse().map((b,k)=>[X(N-1-k),Y(b[0])])];
+  g+=`<path d="M${bp.map(p=>p.join(" ")).join(" L")}Z" fill="#F3D3AE" opacity=".65"/>`;
+  g+=`<path d="M${y.map((v,i)=>X(i)+" "+Y(v)).join(" L")}" fill="none" stroke="#2563B8" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const btp=bt.map((v,k)=>v==null?null:[X(n-BT+k),Y(v)]).filter(Boolean);
+  g+=`<path d="M${btp.map(p=>p.join(" ")).join(" L")}" fill="none" stroke="#C96A00" stroke-width="1.6" stroke-dasharray="4 4" opacity=".7"/>`;
+  const fp=[[X(n-1),Y(y[n-1])],...a.future.map((v,k)=>[X(n+k),Y(v)])];
+  g+=`<path d="M${fp.map(p=>p.join(" ")).join(" L")}" fill="none" stroke="#C96A00" stroke-width="2.2" stroke-dasharray="5 4"/>`;
+  a.future.forEach((v,k)=>g+=`<circle cx="${X(n+k)}" cy="${Y(v)}" r="4" fill="#C96A00" stroke="#fff" stroke-width="2"/>`);
+  g+=`<line id="cx" y1="${m.t}" y2="${Hh-m.b}" stroke="#B0B8C1" stroke-dasharray="3 3" opacity="0"/><rect id="chit" x="${m.l}" y="0" width="${W-m.l-m.r}" height="${Hh}" fill="transparent"/>`;
+  chartSVG.geo={X,N,n,show,W,m,a,y};
+  return `<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="${esc(a.name)} 최근 12개월 실적과 3개월 예측">${g}</svg>`;
+}
+function niceStep(r){const p=Math.pow(10,Math.floor(Math.log10(r||1)));const f=r/p;return(f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;}
+function bindChart(el){
+  const box=el.querySelector("#chart"); if(!box) return; const svg=box.querySelector("svg"), hit=svg.querySelector("#chit"), cx=svg.querySelector("#cx"), tip=box.querySelector("#ctip");
+  const G=chartSVG.geo;
+  const move=ev=>{ const r=svg.getBoundingClientRect(); const px=((ev.touches?ev.touches[0].clientX:ev.clientX)-r.left)/r.width*G.W;
+    const i=Math.max(0,Math.min(G.N-1,Math.round((px-G.m.l)/((G.W-G.m.l-G.m.r)/(G.N-1)))));
+    cx.setAttribute("x1",G.X(i)); cx.setAttribute("x2",G.X(i)); cx.setAttribute("opacity","1");
+    const gi=G.a.y.length-G.show+i; let t=`<b>${mLabel(gi)}</b> `;
+    if(i<G.n){ t+=`실적 ${fmt(G.y[i])}`; const bi=i-(G.n-BT); if(bi>=0&&G.a.r.fc[bi]!=null) t+=` · 미리 맞힌 값 ${fmt(G.a.r.fc[bi])}`; }
+    else { const k=i-G.n; t+=`예측 ${fmt(G.a.future[k])} (${fmt(G.a.band[k][0])}~${fmt(G.a.band[k][1])})`; }
+    tip.innerHTML=t; const x=G.X(i)/G.W*r.width; tip.style.left=Math.max(0,Math.min(r.width-tip.offsetWidth,x-tip.offsetWidth/2))+"px"; tip.style.opacity="1"; };
+  hit.addEventListener("pointermove",move); hit.addEventListener("pointerdown",move);
+  hit.addEventListener("pointerleave",()=>{cx.setAttribute("opacity","0");tip.style.opacity="0";});
+}
+async function fillNames(el){
+  const ids=[...el.querySelectorAll("[data-name]")].map(e=>e.dataset.name).filter(Boolean); if(!ids.length) return;
+  const nm=await names(ids); el.querySelectorAll("[data-name]").forEach(e=>{ e.textContent=nm[e.dataset.name]||"팀원"; });
+}
+
+/* =========================================================
+   7. 화면 전환 (스택 내비게이션)
+   ========================================================= */
+const nav={
+  stack:[], cur(){return this.stack[this.stack.length-1];},
+  push(id){ this.stack.push(id); show(id,"fwd"); },
+  replace(id){ this.stack[this.stack.length-1]=id; show(id,"fwd"); },
+  back(){ if(this.stack.length>1){ this.stack.pop(); show(this.cur(),"back"); } },
+  reset(id){ this.stack=[id]; show(id,"fwd"); }
+};
+let curEl=null;
+async function show(id,dir){
+  const sc=SCREENS[id];
+  if(sc.enter) await sc.enter();
+  const el=document.createElement("div"); el.className="screen "+(dir==="back"?"enter-back":"enter");
+  el.innerHTML=frame(id); $("phone").appendChild(el);
+  if(sc.mount) sc.mount(el);
+  const old=curEl; curEl=el;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ el.classList.remove("enter","enter-back"); if(old){ old.classList.add(dir==="back"?"leave-back":"leave"); setTimeout(()=>old.remove(),360); } }));
+}
+function frame(id){
+  const sc=SCREENS[id]; const canBack=nav.stack.length>1 && !sc.noBack;
+  let top="";
+  if(!sc.noBar){
+    top=`<div class="topbar">${canBack?`<button class="iconbtn" data-back aria-label="뒤로">${ICON.back}</button>`:`<span style="width:40px"></span>`}
+      <div class="title">${sc.title||""}</div>
+      ${sc.noHome?`<span style="width:40px;margin-left:-40px"></span>`:id!=="home"?`<button class="iconbtn" data-home aria-label="홈" style="margin-left:-40px">${ICON.home}</button>`:`<button class="iconbtn" data-profile aria-label="내 정보·로그아웃" style="margin-left:-40px">${avatarHTML(S.account,30)}</button>`}</div>`;
+    if(sc.ch!=null) top+=`<div class="chap">${CH.map((c,i)=>`<div class="${i<sc.ch?'done':i===sc.ch?'on':''}"><i></i>${c}</div>`).join("")}</div>`;
+  }
+  const c=sc.cta?sc.cta():null;
+  return `${top}<div class="body">${sc.html()}</div>${c?`<div class="cta"><button class="btn" data-cta ${c.disabled?"disabled":""}>${c.label}</button></div>`:""}`;
+}
+function refresh(){ // 현재 화면만 다시 그림 (전환 없이)
+  if(!curEl) return; const id=nav.cur(); if(["loading","splash"].includes(id)) return;
+  const sc=SCREENS[id]; const body=curEl.querySelector(".body"); const st=body?body.scrollTop:0;
+  curEl.innerHTML=frame(id); const nb=curEl.querySelector(".body"); if(nb) nb.scrollTop=st;
+  if(sc.mount && id!=="merge") sc.mount(curEl);
+  if(id==="merge") curEl.querySelectorAll(".check").forEach((c,i)=>{ const is=issues(); c.classList.add(i===3&&(is.gaps.length+is.missing.length)?"warn":"done"); });
+}
+
+/* =========================================================
+   8. 바텀시트 · 이벤트
+   ========================================================= */
+function openSheet(html,onClose){ $("sheetBody").innerHTML=html; $("sheet").classList.add("on"); $("dim").classList.add("on"); openSheet.onClose=onClose; }
+function closeSheet(){ $("sheet").classList.remove("on"); $("dim").classList.remove("on"); if(openSheet.onClose) openSheet.onClose(); openSheet.onClose=null; }
+$("dim").addEventListener("click",closeSheet);
+
+document.addEventListener("click",async e=>{
+  const t=e.target.closest("button,[data-go]"); if(!t) return;
+  const d=t.dataset;
+  if(d.back!=null) return nav.back();
+  if(d.home!=null) return nav.reset("home");
+  if(d.profile!=null) return openProfile();
+  if(d.logout!=null) return logout();
+  if(d.sheetgo){ closeSheet(); return nav.push(d.sheetgo); }
+  if(d.go) return nav.push(d.go);
+  if(d.cta!=null){ const c=SCREENS[nav.cur()].cta(); if(!c||c.disabled) return; if(typeof c.go==="function") return c.go(); return nav.push(c.go); }
+  if(d.acc){ const a=S.accounts.find(x=>x.id===d.acc); if(!a) return; S.pinFor=a; S.pin=""; S.pinStage=a.hasPin?"check":"set"; S.pinRole=a.role||null; S.pinErr=""; return nav.push("pin"); }
+  if(d.pinrole){ S.pinRole=d.pinrole; refresh(); return; }
+  if(d.surole){ const el=$("suName"); if(el) S.suName=el.value; S.suRole=d.surole; refresh(); return; }
+  if(d.key!=null){ return pinKey(d.key); }
+  if(d.model){ S.selModel=d.model; return nav.push("detail"); }
+  if(d.method){ S.method[S.selModel]=d.method; refresh(); return; }
+  if(d.fill){ const [k,i,v]=d.fill.split("|"); S.dataset.series[k][+i]=+v; refresh(); toast("추정치로 채웠어요"); await saveDataset(`${k} ${mLabel(+i)} 빈 값을 추정치 ${fmt(+v)}대로 채움`); return; }
+  if(d.input){ const [k,i]=d.input.split("|");
+    openSheet(`<h1 style="font-size:21px">${esc(k)} ${mLabel(+i)}<br>판매실적을 입력해 주세요</h1><input class="field num" id="sheetIn" inputmode="numeric" placeholder="예: 315" style="margin:10px 0 14px"><button class="btn" style="width:100%" id="sheetOk">입력 완료</button>`);
+    setTimeout(()=>$("sheetIn")&&$("sheetIn").focus(),300);
+    $("sheetOk").onclick=async()=>{ const v=+($("sheetIn").value||"").replace(/[^\d]/g,""); if(!v){ toast("숫자를 입력해 주세요"); return; } S.dataset.series[k][+i]=v; closeSheet(); refresh(); toast("입력했어요"); await saveDataset(`${k} ${mLabel(+i)} 판매실적 ${fmt(v)}대 입력`); };
+    return; }
+  if(d.assign){ const [i,k]=d.assign.split("|"); const o=S.dataset.orders[+i]; let note;
+    if(k==="__drop"){ S.dataset.orders.splice(+i,1); note=`딜러주문 ${o.no} 제외`; } else { o.model=k; note=`딜러주문 ${o.no} 차종을 ${k}(으)로 지정`; }
+    refresh(); toast("반영했어요"); await saveDataset(note); return; }
+  if(d.sheet==="limit"){
+    openSheet(`<h1 style="font-size:21px">자동 확정 기준</h1><p class="lead">최근 6개월 예측 오차가 이 안이면 회의 없이 확정해요.</p>
+      <div class="big num" id="limV" style="text-align:center;color:var(--pri)">±${S.limit}%</div><input type="range" id="limR" min="3" max="20" value="${S.limit}" style="margin:16px 0 18px">
+      <button class="btn" style="width:100%" id="limOk">적용</button>`, ()=>{ refresh(); saveLimit(); });
+    $("limR").oninput=ev=>{ S.limit=+ev.target.value; $("limV").textContent="±"+S.limit+"%"; };
+    $("limOk").onclick=closeSheet; return; }
+  if(d.step){ const [k,dv]=d.step.split("|"); S.agreed[k].qty=Math.max(0,(+S.agreed[k].qty||0)+(+dv)); refresh(); return; }
+  if(d.memo){ const [k,m]=d.memo.split("|"); S.agreed[k].memo=S.agreed[k].memo===m?"":m; refresh(); return; }
+  if(d.copy!=null){ const p=S.lastPlan; const txt=[`[${planMonthKo()} 판매계획 확정 · ${TEAM}]`,`자동 ${p.auto} · 협의 ${p.exceptions} · 합계 ${fmt(p.total)}대 · 기준 ±${p.limit}%`,...p.items.map(i=>`- ${i.model}: ${fmt(i.qty)}대 (${i.status}${i.memo?" / "+i.memo:""})`)].join("\n");
+    try{ await navigator.clipboard.writeText(txt); toast("복사했어요"); }catch(err){ openSheet(`<h1 style="font-size:20px">아래 내용을 길게 눌러 복사하세요</h1><textarea class="field" style="height:200px" readonly>${esc(txt)}</textarea>`); } return; }
+});
+document.addEventListener("input",e=>{ if(e.target.id==="suName") S.suName=e.target.value; });
+document.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.dataset.qty){ S.agreed[t.dataset.qty].qty=+t.value.replace(/[^\d]/g,"")||0; refresh(); }
+  if(t.dataset.special){ S.special[t.dataset.special]=t.checked; refresh(); }
+});
+
+async function pinKey(k){
+  if(S.pinBusy) return;
+  if(k==="←"){ S.pin=S.pin.slice(0,-1); return refresh(); }
+  if(S.pin.length>=4) return;
+  S.pin+=k; S.pinErr=""; refresh();
+  if(S.pin.length<4) return;
+  const a=S.pinFor, pin=S.pin; S.pinBusy=true;
+  await new Promise(r=>setTimeout(r,120));
+  try{
+    if(S.pinStage==="check"){
+      if(!S.online && a.pin!==pin) throw Object.assign(new Error("비밀번호가 달라요"),{status:401});
+      await apiLogin(a,pin); nav.reset("home"); toast(`${a.name}님, 반가워요`);
+    } else if(S.pinStage==="set"){ S.pinFirst=pin; S.pin=""; S.pinStage="confirm"; refresh(); }
+    else {
+      if(pin!==S.pinFirst){ S.pin=""; S.pinStage="set"; S.pinErr="두 번 입력한 비밀번호가 달라요. 다시 정해 주세요"; refresh(); }
+      else { if(a.isNew) await apiCreate(a.name,S.pinRole,pin); else await apiSetPin(a,S.pinRole,pin); nav.reset("home"); toast("비밀번호를 정하고 로그인했어요"); }
+    }
+  }catch(e){ S.pin=""; S.pinErr=e.message||"다시 시도해 주세요"; if(e.status===409&&e.data&&e.data.needPin){ S.pinStage="set"; } refresh(); }
+  finally{ S.pinBusy=false; }
+}
+/* =========================================================
+   9. 시작
+   ========================================================= */
+nav.reset("splash");
+boot().then(()=>{ nav.reset(S.account?"home":"login"); if(S.resumed) toast(`${S.account.name}님, 로그인 상태를 이어서 보여드려요`); else if(!S.online) toast("서버에 연결하지 못해 둘러보기 모드로 열었어요"); }).catch(()=>nav.reset("login"));
+</script>
+</body>
+</html>
