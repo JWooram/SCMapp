@@ -172,6 +172,33 @@ h1 em{font-style:normal;color:var(--pri)}
 .toast{position:absolute;left:50%;bottom:96px;transform:translate(-50%,10px);background:rgba(25,31,40,.92);color:#fff;padding:10px 16px;border-radius:12px;font-size:13.5px;opacity:0;transition:none;pointer-events:none;z-index:30;white-space:nowrap}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 input[type=range]{width:100%;accent-color:var(--pri)}
+
+/* Five direct-access tabs: motion is visual-only and never blocks page changes. */
+.tabnav{flex:0 0 auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:7px 10px calc(7px + env(safe-area-inset-bottom,0px));border-top:1px solid #EDF0F4;background:#fff;z-index:5;box-shadow:0 -4px 18px rgba(20,39,70,.03)}
+.tabitem{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:52px;padding:3px 0;border:0;border-radius:12px;background:transparent;color:#8B95A5;font-size:10px;font-weight:750;-webkit-tap-highlight-color:transparent}
+.tabitem .tabicon{width:36px;height:28px;border-radius:10px;display:grid;place-items:center;transition:background .12s ease,transform .12s ease;color:inherit}
+.tabitem svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.tabitem.on{color:#285FD3}.tabitem.on .tabicon{background:#E8F0FF}
+.tabitem:active .tabicon{transform:scale(.91)}.tabitem:focus-visible{outline:2px solid #285FD3;outline-offset:1px}
+.quickgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0 8px}
+.quicktile{min-height:88px;text-align:left;border:1px solid #E4EAF4;background:#F8FAFE;border-radius:16px;padding:13px;display:flex;flex-direction:column;justify-content:space-between;gap:9px}
+.quicktile:active{background:#EBF2FF}.quicktile b{font-size:14px;color:#191F28}.quicktile small{font-size:11px;color:#788492;font-weight:550}
+.setting-profile{display:flex;align-items:center;gap:13px;padding:17px;border:1px solid #E4EAF4;border-radius:18px;background:linear-gradient(125deg,#F7FAFF,#EFF5FF);margin:12px 0 15px}
+.setting-profile .grow{flex:1;min-width:0}
+.audit-store{border:1px solid #DCE8FB;border-radius:16px;padding:14px;background:#F7FAFF;margin-top:10px}
+.audit-store .status{font-size:12px;font-weight:750;color:#1A7D54}
+.audit-store code{display:inline-block;color:#285FD3;font:600 12px ui-monospace,Menlo,monospace;margin-top:6px;word-break:break-word}
+.audit-filter{display:flex;gap:6px;overflow-x:auto;padding:3px 0 11px;scrollbar-width:none}.audit-filter::-webkit-scrollbar{display:none}
+.audit-filter button{flex:0 0 auto;padding:9px 12px;border-radius:999px;border:1px solid #E4EAF4;background:#fff;color:#667080;font-size:12px;font-weight:700}
+.audit-filter button.on{background:#285FD3;color:#fff;border-color:#285FD3}
+.audit-entry{display:flex;gap:11px;align-items:flex-start;padding:14px 0;border-bottom:1px solid #EEF1F6}.audit-entry:last-child{border-bottom:0}
+.audit-mark{flex:0 0 32px;width:32px;height:32px;display:grid;place-items:center;border-radius:11px;background:#EDF3FF;color:#285FD3;font-weight:800;font-size:13px}
+.audit-entry .grow{flex:1;min-width:0}.audit-entry .t{font-size:13.5px;font-weight:700;line-height:1.5;color:#202A38;overflow-wrap:anywhere}
+.audit-entry .s{margin-top:3px;font-size:11.5px;color:#84909E}
+.audit-empty{padding:25px 14px;border-radius:15px;background:#F7F8FA;text-align:center;color:#8590A0;font-size:13px}
+.audit-meta{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.audit-meta button{border:0;background:#EDF3FF;color:#285FD3;padding:8px 11px;border-radius:10px;font-size:12px;font-weight:750}
+@media(prefers-reduced-motion:reduce){.tabitem .tabicon{transition:none!important}}
 </style>
 </head>
 <body>
@@ -217,7 +244,8 @@ const S = {
   online:false, demo:false, planStatus:null, uid:null, me:null, canWrite:null, role:null, member:null,
   dataset: clone(SAMPLE), datasetFromServer:false,
   limit:8, method:{}, special:{}, agreed:{},
-  plans:[], activity:[], accounts:[], account:null, lastSaved:null
+  plans:[], activity:[], accounts:[], account:null, lastSaved:null,
+  auditLogs:[], auditTotal:0, auditFilter:"all", auditStatus:"idle", auditLoading:false, auditError:null
 };
 let user=null;
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
@@ -271,7 +299,7 @@ function startDemo(){
   S.account={...DEMO_ACCOUNT,sessionStart:new Date().toISOString()};
   S.role=DEMO_ACCOUNT.role; S.sessionId=null; S.sessionStart=S.account.sessionStart;
   S.accounts=[S.account]; S.dataset=clone(SAMPLE); S.datasetFromServer=false;
-  S.plans=[]; S.activity=[]; S.lastSaved=null; S.lastPlan=null;
+  S.plans=[]; S.activity=[]; S.lastSaved=null; S.lastPlan=null; S.auditLogs=[]; S.auditTotal=0; S.auditStatus="demo";
   S.limit=8; S.method={}; S.special={}; S.agreed={}; S.planStatus="demo";
   nav.reset("home"); toast("체험 모드 · 변경 내용은 저장되지 않아요");
 }
@@ -299,6 +327,15 @@ function initial(n){ return esc((n||"?").trim().slice(-2)); }
 function avatarHTML(a,size=56){ const c=["#2F6BEA","#0B8A5C","#C25A00","#7B4FD6","#D63B6B","#2E8FA8"]; let h=0; for(const ch of (a?.name||"")) h=(h+ch.charCodeAt(0))%c.length;
   return `<span style="width:${size}px;height:${size}px;border-radius:50%;background:${c[h]};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:${Math.round(size*.34)}px;flex:0 0 ${size}px">${initial(a?.name)}</span>`; }
 function accName(id){ return S.accounts.find(a=>a.id===id)?.name||"팀원"; }
+async function loadAudit(){
+  if(S.auditLoading) return;
+  if(!S.online||S.demo){ S.auditLogs=[]; S.auditStatus="demo"; if(nav.cur()==="settings") refresh(); return; }
+  S.auditLoading=true; S.auditStatus="loading"; S.auditError=null;
+  try{ const d=await api("audit"); S.auditLogs=Array.isArray(d.list)?d.list:[]; S.auditTotal=d.total||0; S.auditStatus="ok"; }
+  catch(e){ S.auditStatus="error"; S.auditError=e.message||"로그를 불러오지 못했어요"; }
+  finally{ S.auditLoading=false; if(nav.cur()==="settings") refresh(); }
+}
+
 async function openProfile(){
   const a=S.account||{}; const ss=await mySessions();
   openSheet(`<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
@@ -377,6 +414,27 @@ const ICON = {
   check:'<svg width="40" height="40" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 };
 
+const tabSvg=paths=>'<svg viewBox="0 0 24 24" aria-hidden="true">'+paths+'</svg>';
+const TABS=[
+  {id:"home",label:"홈",icon:ICON.home},
+  {id:"asis",label:"기획서",icon:tabSvg('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/>')},
+  {id:"merge",label:"수요예측",icon:tabSvg('<path d="M3 18l6-6 4 3 8-9"/><path d="M16 6h5v5"/>')},
+  {id:"records",label:"기록",icon:tabSvg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>')},
+  {id:"settings",label:"설정",icon:tabSvg('<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>')}
+];
+function tabOf(id){
+  if(id==="settings"||id==="server")return "settings";
+  if(id==="records")return "records";
+  if(["merge","fix","loading","result","detail","exception","confirm"].includes(id))return "merge";
+  if(["asis","waste","evidence","goal","ecrs","ai","effect","risk","summary"].includes(id))return "asis";
+  return "home";
+}
+function tabBar(id){
+  if(!S.account||["login","pin","signup","splash"].includes(id))return "";
+  const active=tabOf(id);
+  return '<nav class="tabnav" aria-label="주요 화면 바로가기">'+TABS.map(t=>'<button class="tabitem '+(active===t.id?'on':'')+'" data-tab="'+t.id+'" aria-label="'+t.label+'" aria-current="'+(active===t.id?'page':'false')+'"><span class="tabicon">'+t.icon+'</span><span>'+t.label+'</span></button>').join("")+'</nav>';
+}
+
 const SCREENS = {
 /* ---------- 로그인 ---------- */
 splash:{ noBar:true, html:()=>`<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
@@ -389,7 +447,7 @@ login:{ noBar:true, html:()=>{
       <div class="eyebrow">${TEAM} · SCM 수요예측 도우미</div>
       <h1>누구로<br>로그인할까요?</h1>
       <p class="lead">${S.online?"내 이름을 누르고 비밀번호 4자리를 입력하세요. 접속 기록이 팀 서버에 남아요.":"서버에 연결되지 않아 둘러보기 모드예요. 저장되지 않아요."}</p>
-      ${list.map(a=>`<button class="role" data-acc="${a.id}" style="padding:12px 14px">${avatarHTML(a,44)}<span style="flex:1"><b>${esc(a.name)}</b><br><span class="small">${a.hasPin?`${esc(a.role||"")} · 접속 ${a.loginCount||0}회`:"처음이에요 · 비밀번호를 정해요"}</span></span>${a.online?'<span class="pill ok">접속 중</span>':'<span class="chev">›</span>'}</button>`).join("")}
+      ${list.map(a=>`<button class="role" data-acc="${a.id}" style="padding:12px 14px">${avatarHTML(a,44)}<span style="flex:1"><b>${esc(a.name)}</b><br><span class="small">${a.hasPin?`${esc(a.role||"")} · PIN 입력`:"처음이에요 · 비밀번호를 정해요"}</span></span><span class="chev">›</span></button>`).join("")}
       <button class="role" data-demo style="border-color:var(--pri);background:var(--pri-pale);color:var(--pri);font-weight:800">
         <span class="ic" style="flex:0 0 44px;width:44px;height:44px">D</span><span style="flex:1">가상 체험 로그인<br><span class="small">PIN 0000 · 실제 데이터 저장 안 함</span></span><span class="chev">›</span>
       </button>
@@ -426,6 +484,13 @@ home:{ title:"", right:"records", html:()=>{
       <h1>${esc(S.account?.name||"팀원")}님,<br>${planMonthKo()} 수요계획을 시작해요</h1>
       ${!S.online?`<div class="banner">${S.demo?"가상 체험 모드 · PIN 0000 · 변경 내용은 서버에 저장되지 않아요":"둘러보기 모드 · 서버에 저장되지 않아요"}</div>`:""}
       <div class="hero"><div class="k">TO-BE 수요계획</div><div class="h">데이터는 미리 모으고,<br>예외만 사람이 봐요</div><button data-go="merge">${planMonthKo()} 예측 바로 하기</button></div>
+      <div class="sec">메뉴 바로가기</div>
+      <div class="quickgrid">
+        <button class="quicktile" data-tab="asis"><b>기획서 보기 ›</b><small>문제 정의부터 기대효과까지</small></button>
+        <button class="quicktile" data-tab="merge"><b>수요예측 ›</b><small>데이터 검증과 예측 결과</small></button>
+        <button class="quicktile" data-tab="records"><b>팀 기록 ›</b><small>확정 계획과 활동 내역</small></button>
+        <button class="quicktile" data-tab="settings"><b>설정·DB 로그 ›</b><small>계정과 감사 로그 조회</small></button>
+      </div>
       <div class="sec">기획서</div>
       <button class="tapcard" data-go="asis"><div class="ic">1</div><div class="grow" style="flex:1"><b>기획서 처음부터 보기</b><div class="small">현상인식 → 문제제기 → 목적 → 전략 → 기대효과</div></div><span class="chev">›</span></button>
       <div class="sec">최근 기록</div>
@@ -788,7 +853,7 @@ function frame(id){
     if(sc.ch!=null) top+=`<div class="chap">${CH.map((c,i)=>`<div class="${i<sc.ch?'done':i===sc.ch?'on':''}"><i></i>${c}</div>`).join("")}</div>`;
   }
   const c=sc.cta?sc.cta():null;
-  return `${top}<div class="body">${sc.html()}</div>${c?`<div class="cta"><button class="btn" data-cta ${c.disabled?"disabled":""}>${c.label}</button></div>`:""}`;
+  return `${top}<div class="body">${sc.html()}</div>${c?`<div class="cta"><button class="btn" data-cta ${c.disabled?"disabled":""}>${c.label}</button></div>`:""}${tabBar(id)}`;
 }
 function refresh(){ // 현재 화면만 다시 그림 (전환 없이)
   if(!curEl) return; const id=nav.cur(); if(["loading","splash"].includes(id)) return;
@@ -808,6 +873,9 @@ $("dim").addEventListener("click",closeSheet);
 document.addEventListener("click",async e=>{
   const t=e.target.closest("button,[data-go]"); if(!t) return;
   const d=t.dataset;
+  if(d.tab){ closeSheet(); return nav.reset(d.tab); }
+  if(d.auditFilter){ S.auditFilter=d.auditFilter; refresh(); return; }
+  if(d.auditRefresh!=null) return loadAudit();
   if(d.back!=null) return nav.back();
   if(d.home!=null) return nav.reset("home");
   if(d.profile!=null) return openProfile();
