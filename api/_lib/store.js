@@ -9,58 +9,54 @@ async function blob() {
   if (!blobMod) blobMod = await import("@vercel/blob");
   return blobMod;
 }
-
-class Conflict extends Error {}
+const notFound = e => e && (e.name === "BlobNotFoundError" || /not\s*found/i.test(e.message || ""));
+const isConflict = e => e && (e.name === "BlobPreconditionFailedError" || /precondition/i.test(e.message || ""));
 
 async function readRaw(p) {
   if (LOCAL) {
-    try {
-      const f = path.join(LOCAL, p);
-      const txt = await fs.readFile(f, "utf8");
-      const st = await fs.stat(f);
-      return { txt, etag: String(st.mtimeMs) };
-    } catch { return null; }
+    try { return { txt: await fs.readFile(path.join(LOCAL, p), "utf8") }; } catch { return null; }
   }
   const { get } = await blob();
   try {
     const r = await get(p, { access: "private", useCache: false });
     if (!r || r.statusCode !== 200) return null;
-    const txt = await new Response(r.stream).text();
-    return { txt, etag: r.blob.etag };
-  } catch (e) {
-    if (e && (e.name === "BlobNotFoundError" || /not\s*found/i.test(e.message || ""))) return null;
-    throw e;
-  }
+    return { txt: await new Response(r.stream).text(), etag: r.blob && r.blob.etag };
+  } catch (e) { if (notFound(e)) return null; throw e; }
 }
 
 async function writeRaw(p, txt, etag) {
   if (LOCAL) {
     const f = path.join(LOCAL, p);
     await fs.mkdir(path.dirname(f), { recursive: true });
-    if (etag) { try { const st = await fs.stat(f); if (String(st.mtimeMs) !== etag) throw new Conflict(); } catch (e) { if (e instanceof Conflict) throw e; } }
     await fs.writeFile(f, txt);
     return;
   }
   const { put } = await blob();
-  const opts = { access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json" };
+  const opts = { access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json", cacheControlMaxAge: 60 };
   if (etag) opts.ifMatch = etag;
-  try { await put(p, txt, opts); }
-  catch (e) { if (e && (e.name === "BlobPreconditionFailedError" || /precondition/i.test(e.message || ""))) throw new Conflict(); throw e; }
+  await put(p, txt, opts);
 }
 
 export async function read(p, fallback) {
   const r = await readRaw(p);
   if (!r) return { data: fallback(), etag: null };
-  return { data: JSON.parse(r.txt), etag: r.etag };
+  return { data: JSON.parse(r.txt), etag: r.etag || null };
 }
 
-// 읽고-고치고-쓰기. 다른 사람이 동시에 고쳤으면(etag 불일치) 다시 시도한다.
+// 읽고-고치고-쓰기. 동시 저장 충돌이면 몇 번 다시 시도하고,
+// 그래도 버전 비교가 계속 실패하면 마지막엔 버전 비교 없이 저장한다(수업용 규모라 안전).
 export async function update(p, fallback, fn) {
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 3; i++) {
     const { data, etag } = await read(p, fallback);
     const out = await fn(data);
     try { await writeRaw(p, JSON.stringify(data), etag); return out; }
-    catch (e) { if (e instanceof Conflict) { await new Promise(r => setTimeout(r, 60 * (i + 1) + Math.random() * 60)); continue; } throw e; }
+    catch (e) {
+      if (!isConflict(e)) throw e;
+      await new Promise(r => setTimeout(r, 80 * (i + 1) + Math.random() * 80));
+    }
   }
-  throw new Error("저장 충돌이 반복돼요. 잠시 후 다시 시도해 주세요");
+  const { data } = await read(p, fallback);
+  const out = await fn(data);
+  await writeRaw(p, JSON.stringify(data), null);
+  return out;
 }
