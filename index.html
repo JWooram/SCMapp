@@ -1052,7 +1052,8 @@ async function pinKey(k){
 nav.reset("splash");
 boot().then(()=>{ nav.reset(S.account?"home":"login"); if(S.resumed) toast(`${S.account.name}님, 로그인 상태를 이어서 보여드려요`); else if(!S.online) toast("서버에 연결하지 못해 둘러보기 모드로 열었어요"); }).catch(()=>nav.reset("login"));
 </script>
-<script src="/work-ui.js?v=2"></script>
+<script src="/work-ui.js?v=3"></script>
   <script src="/login-ui.js?v=1"></script>
+<script src="/fix-ui.js?v=1"></script>
 </body>
 </html>
