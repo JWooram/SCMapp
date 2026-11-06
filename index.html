@@ -25,7 +25,7 @@ button{cursor:pointer}
 @media (max-width:480px){.stage{padding:0}.phone{width:100%;height:100vh;border-radius:0;box-shadow:none}}
 
 /* screens */
-.screen{position:absolute;inset:0;display:flex;flex-direction:column;background:#fff;transition:transform .1s cubic-bezier(.2,.8,.2,1),opacity .1s;will-change:transform}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;background:#fff;transition:transform .01s linear,opacity .01s;will-change:transform}
 .screen.enter{transform:translateX(100%)}
 .screen.leave{transform:translateX(-28%);opacity:.6}
 .screen.enter-back{transform:translateX(-28%);opacity:.6}
@@ -140,7 +140,7 @@ h1 em{font-style:normal;color:var(--pri)}
 .field{width:100%;border:1.5px solid var(--line);border-radius:14px;padding:13px 14px;font-size:15px}
 .field:focus{outline:none;border-color:var(--pri)}
 .check{display:flex;gap:12px;align-items:center;padding:12px 0}
-.check .dot{width:28px;height:28px;border-radius:50%;flex:0 0 28px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;background:var(--fill);color:#B0B8C1;transition:all .1s}
+.check .dot{width:28px;height:28px;border-radius:50%;flex:0 0 28px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;background:var(--fill);color:#B0B8C1;transition:all .01s}
 .check.done .dot{background:var(--pri);color:#fff}
 .check.warn .dot{background:var(--warn);color:#fff}
 .check .t{font-weight:700}
@@ -159,14 +159,14 @@ h1 em{font-style:normal;color:var(--pri)}
 .banner{background:var(--warn-pale);color:var(--warn);font-size:12.5px;font-weight:700;border-radius:12px;padding:10px 12px;margin-bottom:12px}
 .chartwrap{position:relative;margin:4px -4px 0}
 .chartwrap svg{display:block;width:100%;height:auto}
-.ctip{position:absolute;top:4px;background:#191F28;color:#fff;border-radius:10px;padding:6px 9px;font-size:11.5px;pointer-events:none;opacity:0;transition:opacity .1s;white-space:nowrap}
+.ctip{position:absolute;top:4px;background:#191F28;color:#fff;border-radius:10px;padding:6px 9px;font-size:11.5px;pointer-events:none;opacity:0;transition:opacity .01s;white-space:nowrap}
 .legend{display:flex;gap:12px;font-size:11.5px;color:var(--ink2);margin-top:4px}
 .legend i{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
 
 /* sheet */
-.dim{position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .1s;z-index:20}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .01s;z-index:20}
 .dim.on{opacity:1;pointer-events:auto}
-.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:24px 24px 0 0;padding:10px 24px 24px;transform:translateY(105%);transition:transform .1s cubic-bezier(.2,.8,.2,1);z-index:21}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:24px 24px 0 0;padding:10px 24px 24px;transform:translateY(105%);transition:transform .01s linear;z-index:21}
 .sheet.on{transform:none}
 .sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 16px}
 .toast{position:absolute;left:50%;bottom:96px;transform:translate(-50%,10px);background:rgba(25,31,40,.92);color:#fff;padding:10px 16px;border-radius:12px;font-size:13.5px;opacity:0;transition:all .2s;pointer-events:none;z-index:30;white-space:nowrap}
@@ -541,7 +541,7 @@ merge:{ ch:3, title:"① 입력·통합", html:()=>{
           .map((c,i)=>`<div class="check" data-i="${i}"><div class="dot">${c[2]==="warn"?"!":"✓"}</div><div><div class="t">${c[0]}</div><div class="s">${c[1]}</div></div></div>`).join("")}
       </div>
       <div class="card small" style="margin-top:14px">E·C·R·S 중 <b style="color:var(--ink)">C 합치기 · R 바꾸기</b> — 담당자가 따로 모으던 자료를 한 번에 받고, 중복은 기계가 걸러요.</div>`; },
-  mount:el=>{ const is=issues(); el.querySelectorAll(".check").forEach((c,i)=>setTimeout(()=>c.classList.add(i===3&&(is.gaps.length+is.missing.length)?"warn":"done"),10+i*15)); },
+  mount:el=>{ const is=issues(); el.querySelectorAll(".check").forEach((c,i)=>setTimeout(()=>c.classList.add(i===3&&(is.gaps.length+is.missing.length)?"warn":"done"),10)); },
   cta:()=>{ const is=issues(); return {label:(is.gaps.length+is.missing.length)?"확인하러 가기":"예측하기", go:(is.gaps.length+is.missing.length)?"fix":"loading"}; } },
 
 /* ---------- 데모: 판단 A / ③ 수정 ---------- */
@@ -562,7 +562,7 @@ fix:{ ch:3, title:"◇ 판단 A", html:()=>{
 loading:{ ch:3, title:"② 수요예측", noBack:true, html:()=>`<div style="text-align:center"><div class="spin"></div><h1>4가지 방법으로<br>예측해 보고 있어요</h1>
     <p class="lead">지난 6개월을 모른다고 치고 미리 맞혀 본 뒤,<br>차종마다 가장 잘 맞은 방법을 골라요.</p>
     <div class="card" style="text-align:left" id="ldList">${Object.values(METHODS).map(m=>`<div class="check"><div class="dot">✓</div><div><div class="t">${m.name}</div><div class="s">${m.desc}</div></div></div>`).join("")}</div></div>`,
-  mount:el=>{ el.querySelectorAll("#ldList .check").forEach((c,i)=>setTimeout(()=>c.classList.add("done"),10+i*15)); setTimeout(()=>{ if(nav.cur()==="loading") nav.replace("result"); },100); },
+  mount:el=>{ el.querySelectorAll("#ldList .check").forEach((c,i)=>setTimeout(()=>c.classList.add("done"),10)); setTimeout(()=>{ if(nav.cur()==="loading") nav.replace("result"); },10); },
   cta:()=>null },
 
 /* ---------- 데모: 예측 결과 ---------- */
@@ -774,7 +774,10 @@ async function show(id,dir){
   el.innerHTML=frame(id); $("phone").appendChild(el);
   if(sc.mount) sc.mount(el);
   const old=curEl; curEl=el;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{ el.classList.remove("enter","enter-back"); if(old){ old.classList.add(dir==="back"?"leave-back":"leave"); setTimeout(()=>old.remove(),110); } }));
+  // 화면을 먼저 계산하고 즉시 전환해 이중 프레임 대기를 없앱니다.
+   void el.offsetWidth;
+   el.classList.remove("enter","enter-back");
+   if(old){ old.classList.add(dir==="back"?"leave-back":"leave"); setTimeout(()=>old.remove(),15); }
 }
 function frame(id){
   const sc=SCREENS[id]; const canBack=nav.stack.length>1 && !sc.noBack;
@@ -854,7 +857,7 @@ async function pinKey(k){
   S.pin+=k; S.pinErr=""; refresh();
   if(S.pin.length<4) return;
   const a=S.pinFor, pin=S.pin; S.pinBusy=true;
-  await new Promise(r=>setTimeout(r,20));
+  await new Promise(r=>setTimeout(r,10));
   try{
     if(S.pinStage==="check"){
       if(a.id===DEMO_ACCOUNT.id){
