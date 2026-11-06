@@ -857,7 +857,10 @@ async function pinKey(k){
   S.pin+=k; S.pinErr=""; refresh();
   if(S.pin.length<4) return;
   const a=S.pinFor, pin=S.pin; S.pinBusy=true;
-  await new Promise(r=>setTimeout(r,10));
+  // 모든 팀원의 PIN 입력 직후 즉시 서버 인증을 시작합니다. 인위적인 대기는 없습니다.
+  if(S.pinStage==="check" && a.id!==DEMO_ACCOUNT.id){
+    const msg=$("pinMsg"); if(msg) msg.textContent="비밀번호 확인 중…";
+  }
   try{
     if(S.pinStage==="check"){
       if(a.id===DEMO_ACCOUNT.id){
