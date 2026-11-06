@@ -33,7 +33,7 @@ async function writeRaw(p, txt, etag) {
   }
   const { put } = await blob();
   const opts = { access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json", cacheControlMaxAge: 60 };
-  if (etag) opts.ifMatch = etag;
+  // Vercel Blob의 get() ETag와 put() ifMatch 형식이 맞지 않아 버전 비교는 쓰지 않는다(마지막 저장 우선).
   await put(p, txt, opts);
 }
 
@@ -43,18 +43,8 @@ export async function read(p, fallback) {
   return { data: JSON.parse(r.txt), etag: r.etag || null };
 }
 
-// 읽고-고치고-쓰기. 동시 저장 충돌이면 몇 번 다시 시도하고,
-// 그래도 버전 비교가 계속 실패하면 마지막엔 버전 비교 없이 저장한다(수업용 규모라 안전).
+// 읽고-고치고-쓰기 (수업용 규모라 마지막 저장 우선으로 충분)
 export async function update(p, fallback, fn) {
-  for (let i = 0; i < 3; i++) {
-    const { data, etag } = await read(p, fallback);
-    const out = await fn(data);
-    try { await writeRaw(p, JSON.stringify(data), etag); return out; }
-    catch (e) {
-      if (!isConflict(e)) throw e;
-      await new Promise(r => setTimeout(r, 80 * (i + 1) + Math.random() * 80));
-    }
-  }
   const { data } = await read(p, fallback);
   const out = await fn(data);
   await writeRaw(p, JSON.stringify(data), null);
