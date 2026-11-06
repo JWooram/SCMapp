@@ -1,40 +1,60 @@
-// 저장소: Vercel Blob(비공개)에 JSON 파일로 저장한다.
-// 로컬 점검 때는 LOCAL_STORE_DIR 환경변수가 있으면 디스크 폴더를 대신 쓴다.
+// 저장소: Upstash Redis(무료) 환경변수가 있으면 Redis에, 없으면 Vercel Blob(비공개)에 JSON으로 저장한다.
+// - Redis: Vercel Marketplace의 Upstash Redis 연결 시 KV_REST_API_URL/KV_REST_API_TOKEN
+//          (또는 UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN)이 자동으로 생긴다. 패키지 설치 불필요(REST 호출).
+// - 로컬 점검 때는 LOCAL_STORE_DIR 환경변수가 있으면 디스크 폴더를 대신 쓴다.
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
 const LOCAL = process.env.LOCAL_STORE_DIR;
+const R_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+const R_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+const PREFIX = "scm:";
+export const STORE_KIND = LOCAL ? "local" : R_URL && R_TOKEN ? "upstash-redis" : "vercel-blob";
+
+async function redis(cmd) {
+  const r = await fetch(R_URL, { method: "POST", headers: { Authorization: `Bearer ${R_TOKEN}`, "content-type": "application/json" }, body: JSON.stringify(cmd) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.error) throw new Error("Redis 저장소 오류: " + (d.error || r.status));
+  return d.result;
+}
+
 let blobMod = null;
 async function blob() {
   if (!blobMod) blobMod = await import("@vercel/blob");
   return blobMod;
 }
 const notFound = e => e && (e.name === "BlobNotFoundError" || /not\s*found/i.test(e.message || ""));
-const isConflict = e => e && (e.name === "BlobPreconditionFailedError" || /precondition/i.test(e.message || ""));
 
 async function readRaw(p) {
   if (LOCAL) {
     try { return { txt: await fs.readFile(path.join(LOCAL, p), "utf8") }; } catch { return null; }
+  }
+  if (STORE_KIND === "upstash-redis") {
+    const v = await redis(["GET", PREFIX + p]);
+    return v == null ? null : { txt: v };
   }
   const { get } = await blob();
   try {
     const r = await get(p, { access: "private", useCache: false });
     if (!r || r.statusCode !== 200) return null;
     return { txt: await new Response(r.stream).text(), etag: r.blob && r.blob.etag };
-  } catch (e) { if (notFound(e)) return null; throw e; }
+  } catch (e) {
+    if (notFound(e)) return null;
+    if (/403/.test(e.message || "")) throw new Error("저장소 사용 한도를 넘어 서버 저장소가 일시 정지됐어요 (Vercel Blob 403)");
+    throw e;
+  }
 }
 
-async function writeRaw(p, txt, etag) {
+async function writeRaw(p, txt) {
   if (LOCAL) {
     const f = path.join(LOCAL, p);
     await fs.mkdir(path.dirname(f), { recursive: true });
     await fs.writeFile(f, txt);
     return;
   }
+  if (STORE_KIND === "upstash-redis") { await redis(["SET", PREFIX + p, txt]); return; }
   const { put } = await blob();
-  const opts = { access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json", cacheControlMaxAge: 60 };
-  // Vercel Blob의 get() ETag와 put() ifMatch 형식이 맞지 않아 버전 비교는 쓰지 않는다(마지막 저장 우선).
-  await put(p, txt, opts);
+  await put(p, txt, { access: "private", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json", cacheControlMaxAge: 60 });
 }
 
 export async function read(p, fallback) {
@@ -47,6 +67,13 @@ export async function read(p, fallback) {
 export async function update(p, fallback, fn) {
   const { data } = await read(p, fallback);
   const out = await fn(data);
-  await writeRaw(p, JSON.stringify(data), null);
+  await writeRaw(p, JSON.stringify(data));
   return out;
+}
+
+// 파일(키) 삭제
+export async function remove(p) {
+  if (LOCAL) { await fs.rm(path.join(LOCAL, p), { force: true }); return; }
+  if (STORE_KIND === "upstash-redis") { await redis(["DEL", PREFIX + p]); return; }
+  const { del } = await blob(); await del(p);
 }
