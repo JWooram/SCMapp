@@ -304,7 +304,10 @@ async function poll(){ // 15초마다 팀 데이터 새로고침 (다른 사람 
   if(!S.online||document.hidden) return;
   try{ const had=!!S.account; const d=await api("bootstrap"); applyBoot(d);
     if(had&&!d.me){ S.account=null; nav.reset("login"); toast("로그인이 끝났어요. 다시 로그인해 주세요"); return; }
-    if(!["pin","signup","exception","loading","confirm"].includes(nav.cur())) refresh(); }catch(e){}
+    const formScreen=["pin","signup","signuprole","changePin","exception","loading","confirm","roleorder","rolecapacity","roleforecastedit","rolerules","roleexceptionnew","roleexceptiondetail","rolereason","roletransfers"].includes(nav.cur());
+    if(!formScreen) refresh();
+    if(typeof window.refreshWorkspace==="function"&&S.account) void window.refreshWorkspace(true);
+  }catch(e){}
 }
 function seedLocal(){ TEAM_MEMBERS.forEach((n,i)=>S.accounts.push({id:"local"+i,name:n,role:null,hasPin:false,loginCount:0})); }
 function handleWriteErr(e){
