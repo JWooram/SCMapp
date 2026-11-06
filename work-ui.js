@@ -45,7 +45,7 @@ async function syncWorkspace(force=false){
   const result=await api("workspace");
   S.workspace=result.workspace||noData();S.workAt=Date.now();
   if(S.workspace.rules?.threshold>=1)S.limit=S.workspace.rules.threshold;
-  if(curEl&&["home","roleoverview","roleforecast","rolerules","roleorder","rolestatus","rolecapacity","roletransfers","roleexceptions","roleexceptiondetail","rolereport"].includes(nav.cur()))refresh();
+  if(curEl&&["home","roleoverview","roleforecast","rolestatus","roleexceptions","rolereport"].includes(nav.cur()))refresh();
  }catch(err){console.warn("직무 업무 조회:",err.message);}
  finally{S.workBusy=false;}
 }
@@ -294,6 +294,7 @@ function define(id,title,fn){
  SCREENS[id]={title,enter:()=>{void syncWorkspace();},html:fn};
 }
 S.workspace=S.workspace||noData();
+window.refreshWorkspace=syncWorkspace;
 const originalHome=SCREENS.home.html;
 SCREENS.home.enter=()=>{void syncWorkspace();};
 SCREENS.home.html=roleHome;
