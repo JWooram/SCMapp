@@ -166,6 +166,45 @@ if(SCREENS.confirm){
       <button class="tapcard" data-go="records"><div class="ic g">✓</div><div style="flex:1"><b>팀 기록에서 보기</b><div class="small">확정한 계획 이력을 확인해요</div></div><span class="chev">›</span></button>`;
   }, cta:()=>({label:"홈으로",go:()=>nav.reset("home")}) };
 }
+
+/* ---------- 4. 현황 탭 · 기존 주문·판매실적 검증 (예측 탭으로 넘어가지 않음) ---------- */
+if(SCREENS.roleoverview){
+  const ovHtml=SCREENS.roleoverview.html;
+  SCREENS.roleoverview.html=()=>ovHtml().replace('data-go="merge"><div class="grow"><b>기존 주문·판매실적 검증','data-go="roleverify"><div class="grow"><b>기존 주문·판매실적 검증');
+  const baseTab=window.roleTabActive;
+  if(typeof baseTab==="function") window.roleTabActive=id=>id==="roleverify"?"roleoverview":baseTab(id);
+  SCREENS.roleverify={ title:"주문·실적 검증", enter:()=>{ if(typeof window.refreshWorkspace==="function") void window.refreshWorkspace(); }, html:()=>{
+    const ds=S.dataset||{series:{},orders:[]}, orders=ds.orders||[], series=ds.series||{};
+    const is=issues(); const dupSet=new Set(is.dups), misSet=new Set(is.missing);
+    const sales=(W().orders||[]);
+    const pill=(t,k)=>`<span class="pill ${k}">${t}</span>`;
+    const row=(t,s,r)=>`<div class="row"><div class="grow"><div class="t">${t}</div><div class="s">${s}</div></div>${r||""}</div>`;
+    const okBox=t=>`<div class="card small" style="color:#1B8E5A">✓ ${t}</div>`;
+    const flagged=orders.map((o,i)=>({o,i})).filter(x=>dupSet.has(x.i)||misSet.has(x.i));
+    const salesDup=(()=>{const seen=new Map(),out=[];sales.forEach(x=>{const k=[x.dealer,x.model,x.targetMonth||"",x.quantity].join("|");if(seen.has(k))out.push(x);else seen.set(k,1);});return out;})();
+    const totalSales=Object.values(series).reduce((s,a)=>s+a.reduce((t,v)=>t+(Number(v)||0),0),0);
+    return `<div class="eyebrow">SCM · 데이터 검증</div><h1>기존 주문·판매실적을<br>한 번에 확인해요</h1>
+    <p class="lead">딜러 주문의 중복·차종 누락과 월별 판매실적의 빈 값을 점검해요. 이 화면은 확인용이며 예측 탭으로 넘어가지 않아요.</p>
+    <div class="stats"><div class="stat"><div class="v">${fmt(orders.length)}</div><div class="l">기존 딜러 주문</div><div class="d">건</div></div>
+      <div class="stat"><div class="v" style="color:${is.dups.length?"var(--warn)":"inherit"}">${is.dups.length}</div><div class="l">중복 주문</div><div class="d">같은 주문번호</div></div>
+      <div class="stat"><div class="v" style="color:${is.missing.length?"var(--warn)":"inherit"}">${is.missing.length}</div><div class="l">차종 누락</div><div class="d">주문 정보</div></div></div>
+    <div class="stats"><div class="stat"><div class="v">${Object.keys(series).length}</div><div class="l">판매실적 차종</div><div class="d">종</div></div>
+      <div class="stat"><div class="v">${fmt(totalSales)}</div><div class="l">누적 판매실적</div><div class="d">대</div></div>
+      <div class="stat"><div class="v" style="color:${is.gaps.length?"var(--warn)":"inherit"}">${is.gaps.length}</div><div class="l">실적 빈 값</div><div class="d">월</div></div></div>
+    <div class="sec">기존 주문 점검 결과</div>
+    ${flagged.length?`<div class="card">${flagged.map(({o,i})=>row(`${esc(o.no)} · ${esc(o.dealer)}`,`${o.model?esc(o.model):"차종 없음"} · ${fmt(o.qty)}대`,dupSet.has(i)?pill("중복","warn"):pill("차종 누락","warn"))).join("")}</div>`:okBox("중복·누락된 주문이 없어요")}
+    <div class="sec">기존 딜러 주문 전체 (${orders.length}건)</div>
+    <div class="card">${orders.map((o,i)=>row(`${esc(o.no)} · ${esc(o.dealer)}`,`${o.model?esc(o.model):"차종 없음"}`,`<b class="num">${fmt(o.qty)}대</b>`)).join("")||'<div class="small">주문 데이터가 없어요</div>'}</div>
+    <div class="sec">판매실적 빈 값</div>
+    ${is.gaps.length?`<div class="card">${is.gaps.map(g=>row(esc(g.model),`${mLabel(g.i)} 실적 없음`,pill("빈 값","warn"))).join("")}</div>`:okBox("빈 값이 없어요")}
+    <div class="sec">차종별 판매실적 요약</div>
+    <div class="card">${Object.entries(series).map(([k,a])=>{const vals=a.filter(v=>v!=null&&v!=="");const avg=vals.length?vals.reduce((s,v)=>s+ +v,0)/vals.length:0;const last=a[a.length-1];
+      return row(esc(k),`${mLabel(0)}~${mLabel(a.length-1)} · ${vals.length}/${a.length}개월 · 월평균 ${fmt(avg)}대`,`<b class="num">${last==null?"–":fmt(last)+"대"}</b>`);}).join("")}</div>
+    <div class="sec">영업팀 신규 주문 (${sales.length}건)</div>
+    ${sales.length?`<div class="card">${sales.slice(0,15).map(x=>row(`${esc(x.dealer)} · ${esc(x.model)}`,`${esc(x.targetMonth||"월 미지정")} · ${fmt(x.quantity)}대`,salesDup.includes(x)?pill("중복 의심","warn"):pill(esc(x.status||"접수"),"ok"))).join("")}</div>`:`<div class="card small">아직 영업팀이 입력한 주문이 없어요</div>`}
+    <p class="small" style="margin:15px 0">최근 월은 맨 오른쪽 숫자예요. 빈 값 보정과 예측 재계산은 예측 탭에서 할 수 있어요.</p>`;
+  }};
+}
 const css=document.createElement("style");
 css.textContent=`.adj-toggle{display:flex;gap:6px;background:#F2F4F6;border-radius:12px;padding:4px;margin-bottom:10px}
 .adj-toggle button{flex:1;border:0;background:transparent;border-radius:9px;padding:10px 0;font-weight:700;color:#6B7684;font-size:15px}
