@@ -8,8 +8,8 @@ export const P = {
   sessions: "db/sessions.json",
   dataset: "db/dataset.json",
   plans: "db/plans.json",
-  activity: "db/activity.json",
-  audit: "db/audit.json",
+  activity: "db/logtable/activity-v1.json",
+  audit: "db/logtable/audit-v1.json",
   workspace: "db/workspace.json",
 };
 const now = () => new Date().toISOString();
