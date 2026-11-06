@@ -720,6 +720,35 @@ summary:{ ch:4, html:()=>`<div class="eyebrow">한 장으로</div>
     <div class="small">근1·근2 현대자동차 공급망 지속가능성 관리정책 (PDF), 2026.09.09<br>흐름도에서 셈 · 우리 팀 AS-IS·TO-BE 흐름도 (SCM 학습 및 개선 기획 기록, 현대 HINT, 2026.11.05)<br>가정 · 리드타임·회의·오차율 목표치는 현업 데이터로 확인 전</div>`,
   cta:()=>({label:"처음으로",go:()=>nav.reset("home")}) },
 
+
+/* ---------- 설정 · 별도 감사 로그 DB ---------- */
+settings:{ title:"설정", enter:()=>{ void loadAudit(); }, html:()=>{
+  const types=[["all","전체"],["login","로그인"],["logout","로그아웃"],["data","데이터"],["plan","계획"],["account","계정"]];
+  const labels={login:"로그인",logout:"로그아웃",data:"데이터 변경",plan:"계획 확정",account:"계정 관리"};
+  const icons={login:"→",logout:"←",data:"D",plan:"✓",account:"+"};
+  const filtered=(S.auditLogs||[]).filter(a=>S.auditFilter==="all"||a.type===S.auditFilter);
+  const status=S.auditStatus==="demo"?"체험 계정":S.auditStatus==="ok"?"연결됨":S.auditStatus==="error"?"조회 오류":"연결 확인 중";
+  return '<div class="eyebrow">ACCOUNT & AUDIT LOG</div>'
+    +'<h1>설정과 활동 기록</h1><p class="lead">계정과 팀원별 작업 이력을 한곳에서 관리해요.</p>'
+    +'<div class="setting-profile">'+avatarHTML(S.account,50)+'<div class="grow"><b style="font-size:17px">'+esc(S.account?.name||"팀원")+'</b><div class="small">'+esc(S.role||"")+' · '+TEAM+'</div><div class="small" style="margin-top:4px">'+(S.online?"최근 접속 "+when(S.sessionStart):"체험 모드 · 서버 저장 안 함")+'</div></div><span class="pill '+(S.online?"ok":"k")+'">'+(S.online?"LIVE":"DEMO")+'</span></div>'
+    +'<div class="sec">전용 로그 DB</div>'
+    +'<div class="audit-store"><div class="audit-meta"><b>감사 로그 저장소</b><span class="status">● '+status+'</span></div>'
+    +'<code>Vercel Blob / db/audit.json</code><div class="small" style="margin-top:7px">로그인 · 로그아웃 · 데이터 수정 · 판매계획 확정 · 계정 관리</div>'
+    +'<div class="small">기존 활동 기록과 별도 저장 · 인증된 팀원만 조회</div></div>'
+    +'<div class="sec">로그 내역</div>'
+    +'<div class="audit-meta" style="margin-bottom:10px"><span class="small">전체 '+fmt(S.auditTotal||0)+'건 · 최근 120건 조회</span><button data-audit-refresh '+(S.auditLoading?"disabled":"")+'>↻ 새로고침</button></div>'
+    +'<div class="audit-filter">'+types.map(a=>'<button class="'+(a[0]===S.auditFilter?"on":"")+'" data-audit-filter="'+a[0]+'">'+a[1]+'</button>').join("")+'</div>'
+    +(S.auditStatus==="demo"?'<div class="audit-empty">가상 체험에서는 실제 팀 로그를 열람할 수 없어요.<br>팀원 계정으로 로그인해 주세요.</div>'
+      :S.auditStatus==="loading"||S.auditStatus==="idle"?'<div class="audit-empty">로그 기록을 불러오고 있어요…</div>'
+      :S.auditStatus==="error"?'<div class="audit-empty">'+esc(S.auditError||"로그를 불러올 수 없어요")+'<br>새로고침으로 다시 시도할 수 있어요.</div>'
+      :filtered.length?'<div class="card" style="padding:4px 14px">'+filtered.map(a=>'<div class="audit-entry"><div class="audit-mark">'+(icons[a.type]||"·")+'</div><div class="grow"><div class="t">'+esc(a.text||labels[a.type]||"활동")+'</div><div class="s">'+esc(accName(a.by))+' · '+when(a.at)+' · '+(labels[a.type]||"기타")+(a.meta?.device?' · '+esc(a.meta.device):"")+'</div></div></div>').join("")+'</div>'
+      :'<div class="audit-empty">아직 이 유형의 기록이 없어요.<br>전용 로그 저장소 활성화 이후부터 기록됩니다.</div>')
+    +'<div class="sec">앱 관리</div>'
+    +'<button class="tapcard" data-go="server"><div class="ic k">DB</div><div class="grow"><b>저장소·API 구조</b><div class="small">데이터가 저장되는 위치 확인</div></div><span class="chev">›</span></button>'
+    +'<button class="tapcard" data-logout><div class="ic">↪</div><div class="grow"><b>로그아웃</b><div class="small">현재 세션 종료 및 기록 저장</div></div><span class="chev">›</span></button>'
+    +'<p class="small" style="margin:12px 0 15px">PIN 원문은 저장되지 않으며, 비공개 감사 로그는 팀 인증 후에만 조회됩니다.</p>';
+} },
+
 /* ---------- 기록 ---------- */
 records:{ title:"기록", html:()=>{
     if(!S.online) return `<h1>기록</h1><div class="banner">둘러보기 모드라 서버 기록을 볼 수 없어요</div>`;
@@ -746,7 +775,8 @@ POST  /api/logout      세션 종료 · 사용 시간 기록
 GET   /api/sessions    내 접속 기록 (최근 10회)
 PATCH /api/me          내 설정 (자동 확정 기준)
 PUT   /api/dataset     판매·딜러 데이터 저장
-POST  /api/plans       판매계획 확정 저장</div>
+POST  /api/plans       판매계획 확정 저장
+ GET   /api/audit       로그인한 팀원의 감사 로그 조회</div>
     <div class="sec">저장소 (Vercel Blob · 비공개)</div>
     <div class="code">db/accounts.json   팀원 계정
   id, name, role, team,
@@ -769,12 +799,15 @@ db/plans.json      확정한 판매계획 (월별)
   exceptions, limit, confirmedBy, confirmedAt
 
 db/activity.json   활동 기록 (최근 300건)
-  type, text, by, at</div>
+  type, text, by, at
+
+db/audit.json      별도 감사 로그 (최근 1,000건)
+  id, type, text, by, at, meta</div>
     <div class="sec">보안</div>
     <div class="row"><div class="grow"><div class="t" style="font-size:14px">비밀번호</div><div class="s">원문은 저장하지 않고 서버에서 scrypt 해시로만 비교 · 5번 틀리면 5분 잠금</div></div></div>
     <div class="row"><div class="grow"><div class="t" style="font-size:14px">세션</div><div class="s">브라우저에는 HttpOnly 쿠키만, 서버에는 토큰 해시만 저장 · 7일 유지</div></div></div>
     <div class="row"><div class="grow"><div class="t" style="font-size:14px">쓰기 권한</div><div class="s">데이터 수정·계획 확정은 로그인한 사람만 (서버에서 확인)</div></div></div>
-    <div class="row"><div class="grow"><div class="t" style="font-size:14px">동시 저장</div><div class="s">여러 명이 동시에 저장하면 버전(ETag)을 비교해 자동으로 다시 시도</div></div></div>
+    <div class="row"><div class="grow"><div class="t" style="font-size:14px">동시 저장</div><div class="s">현재는 마지막 저장이 우선하며, 동시 수정 충돌 방지 기능은 보완 예정</div></div></div>
     <div class="src">수업용 시제품이에요. 비밀번호 4자리는 편의를 위한 것이라 실서비스라면 더 긴 비밀번호와 2단계 인증이 필요해요.</div>` }
 };
 
