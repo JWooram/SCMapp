@@ -105,3 +105,15 @@ h1{color:#191F28;font-weight:800;font-size:28px;line-height:1.37;letter-spacing:
 .work-pill.ok{background:#E8F8F2;color:#008F6B}
 @media(max-width:480px){.stage,.body{background:#fff}.phone{background:#fff;border-radius:0;border:0;box-shadow:none}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0s!important;animation-duration:.01ms!important}}
+
+/* Settings > Log Table */
+.log-table-box{background:#fff;border:1px solid #E8EDF3;border-radius:17px;overflow:hidden;margin-top:10px}
+.log-table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:12px}
+.log-table th{background:#F9FAFB;text-align:left;font-size:11px;color:#8B95A1;padding:12px 11px;font-weight:800}
+.log-table td{vertical-align:top;padding:12px 11px;border-top:1px solid #F2F4F6;color:#4E5968;overflow-wrap:anywhere}
+.log-table td:first-child,.log-table th:first-child{width:103px}
+.log-table td b{display:block;font-size:11.5px;color:#333D4B;margin-bottom:6px;line-height:1.5}
+.log-table td span:not(.work-pill){display:block;line-height:1.65;color:#6B7684}
+.log-table .work-pill{font-size:10px;padding:4px 7px;background:#E8F3FF;color:#3182F6;font-weight:750}
+.log-table tr:last-child td{border-bottom:0}
+@media(max-width:380px){.log-table td:first-child,.log-table th:first-child{width:92px}.log-table th,.log-table td{padding:11px 8px}}
