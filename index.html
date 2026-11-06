@@ -2,7 +2,9 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F7F9FD">
+<meta name="description" content="SCM 수요예측 도우미: 데이터 검증, 통계 기반 예측, 예외 판단, 팀 기록을 하나로 연결한 HINT 2기 1조 시제품.">
 <title>SCM 수요예측 도우미</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -200,9 +202,24 @@ input[type=range]{width:100%;accent-color:var(--pri)}
 .audit-meta button{border:0;background:#EDF3FF;color:#285FD3;padding:8px 11px;border-radius:10px;font-size:12px;font-weight:750}
 @media(prefers-reduced-motion:reduce){.tabitem .tabicon{transition:none!important}}
 </style>
+<link rel="stylesheet" href="/taste-ui.css?v=1">
 </head>
 <body>
-<div class="stage"><div class="phone" id="phone">
+<div class="stage">
+  <aside class="studio-intro" aria-label="SCM 수요예측 도우미 프로젝트 소개">
+    <div class="studio-brand"><span class="studio-symbol" aria-hidden="true">S</span><span>SCM DEMAND STUDIO<br><span style="font-weight:600;color:#93A0B1;letter-spacing:0">HINT 2기 1조</span></span></div>
+    <div class="studio-kicker">SCM DEMAND PLANNING</div>
+    <h2>수요를 읽고,<br><em>판단은 더 빠르게.</em></h2>
+    <p class="studio-desc">흩어진 판매실적과 딜러 주문을 하나로 모으고, 수요예측부터 예외 협의와 판매계획 확정까지 자연스럽게 연결합니다.</p>
+    <div class="studio-divider"></div>
+    <div class="studio-steps" aria-label="서비스의 주요 업무 흐름">
+      <div class="studio-step"><b>01</b><div><span>데이터 통합과 검증</span><small>누락과 중복을 예측 전에 확인합니다.</small></div></div>
+      <div class="studio-step"><b>02</b><div><span>4가지 방식으로 수요예측</span><small>백테스트 오차를 비교해 방법을 선택합니다.</small></div></div>
+      <div class="studio-step"><b>03</b><div><span>예외 판단과 계획 확정</span><small>협의가 필요한 항목만 살펴보고 기록을 남깁니다.</small></div></div>
+    </div>
+    <div class="studio-foot">현대 HINT 교육 프로젝트 · 실제 기업의 공식 시스템이 아닙니다.</div>
+  </aside>
+  <div class="phone" id="phone">
   <div class="dim" id="dim"></div>
   <div class="sheet" id="sheet"><div class="grab"></div><div id="sheetBody"></div></div>
   <div class="toast" id="toast"></div>
