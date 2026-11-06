@@ -10,6 +10,7 @@ export const P = {
   plans: "db/plans.json",
   activity: "db/activity.json",
   audit: "db/audit.json",
+  workspace: "db/workspace.json",
 };
 const now = () => new Date().toISOString();
 const id = (n = 10) => crypto.randomBytes(n).toString("base64url");
@@ -54,7 +55,7 @@ export const validPin = p => /^\d{4}$/.test(String(p || ""));
 /* ---------- 공개용 계정 정보 (해시·잠금 정보 제외) ---------- */
 export function publicAccount(a) {
   if (!a) return null;
-  const { salt, hash, fails, lockUntil, ...rest } = a;
+  const { salt, hash, fails, lockUntil, pinChangeFails, pinChangeLockUntil, ...rest } = a;
   return { ...rest, hasPin: !!hash };
 }
 
