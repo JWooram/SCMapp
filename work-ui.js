@@ -7,7 +7,7 @@
 const SCM="SCM 수요계획팀", SALES="영업팀", PROD="생산기획팀";
 const demo=()=>!!S.demo;
 const teamRole=()=>S.role||SCM;
-const modelNames=()=>Object.keys(S.dataset.series||{});
+const modelNames=()=>[...new Set([...Object.keys(S.dataset.series||{}),...((S.workspace&&S.workspace.models)||[])])];
 const noData=()=>({rules:{threshold:8},orders:[],capacities:[],inventory:[],overrides:[],exceptions:[],transfers:[]});
 const db=()=>S.workspace||noData();
 const v=(id)=>document.getElementById(id)?.value?.trim()||"";
@@ -72,7 +72,7 @@ async function submit(actionName,data,goTo){
   if(demo()){simulate(actionName,data);}
   else{await api("workspace",{method:"POST",body:{action:actionName,data}});await syncWorkspace(true);}
   toast("저장했어요"+(demo()?" · 체험 데이터":""));
-  nav.reset(goTo||"home");
+  {const tgt=goTo||"home";if(tgt===nav.cur())refresh();else if(nav.stack.length>1)nav.replace(tgt);else nav.reset(tgt);} // 저장 후에도 뒤로가기 유지
  }catch(e){toast(e.message||"처리하지 못했어요");if(locked)locked.disabled=false;}
 }
 function roleHome(){
@@ -89,9 +89,7 @@ function roleHome(){
    +tile("공통 예외 협의","영업·생산기획 의견 확인 후 최종 결정","roleexceptions")
    +tile("판매계획 전달","확정 계획을 생산기획팀에 전송","roletransfers")
    +tile("핵심 지표 리포트","오차율·예외 건수·목표 대비 실적","rolereport")
-   +'<div class="sec">프로젝트와 기존 기능</div>'
-   +tile("개선 기획서","AS-IS → TO-BE → 기대효과","asis")
-   +tile("통계 예측 상세 보기","그래프·백테스트·데이터 검증","merge")+note();
+   +note();
  }
  if(role===SALES){
   const mine=db().orders.filter(x=>x.by===no());
