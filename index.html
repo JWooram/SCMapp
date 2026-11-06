@@ -449,8 +449,9 @@ function tabOf(id){
 }
 function tabBar(id){
   if(!S.account||["login","pin","signup","splash"].includes(id))return "";
-  const active=tabOf(id);
-  return '<nav class="tabnav" aria-label="주요 화면 바로가기">'+TABS.map(t=>'<button class="tabitem '+(active===t.id?'on':'')+'" data-tab="'+t.id+'" aria-label="'+t.label+'" aria-current="'+(active===t.id?'page':'false')+'"><span class="tabicon">'+t.icon+'</span><span>'+t.label+'</span></button>').join("")+'</nav>';
+  const active=typeof window.roleTabActive==="function"?window.roleTabActive(id):tabOf(id);
+  const tabs=typeof window.roleTabs==="function"?window.roleTabs():TABS;
+  return '<nav class="tabnav" aria-label="주요 화면 바로가기">'+tabs.map(t=>'<button class="tabitem '+(active===t.id?'on':'')+'" data-tab="'+t.id+'" aria-label="'+t.label+'" aria-current="'+(active===t.id?'page':'false')+'"><span class="tabicon">'+t.icon+'</span><span>'+t.label+'</span></button>').join("")+'</nav>';
 }
 
 const SCREENS = {
@@ -1048,5 +1049,6 @@ async function pinKey(k){
 nav.reset("splash");
 boot().then(()=>{ nav.reset(S.account?"home":"login"); if(S.resumed) toast(`${S.account.name}님, 로그인 상태를 이어서 보여드려요`); else if(!S.online) toast("서버에 연결하지 못해 둘러보기 모드로 열었어요"); }).catch(()=>nav.reset("login"));
 </script>
+<script src="/work-ui.js?v=1"></script>
 </body>
 </html>
