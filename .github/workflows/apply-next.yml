@@ -1,0 +1,25 @@
+name: apply-next
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: "*.next.* 파일을 원래 파일에 적용"
+        run: |
+          found=0
+          while IFS= read -r f; do
+            target="${f/.next./.}"
+            git mv -f "$f" "$target"
+            found=1
+          done < <(git ls-files | grep -E '\.next\.[A-Za-z0-9]+$' || true)
+          if [ "$found" = 0 ]; then echo "적용할 파일 없음"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "새 버전 파일 적용 (.next → 원래 파일)"
+          git push
