@@ -25,7 +25,7 @@ button{cursor:pointer}
 @media (max-width:480px){.stage{padding:0}.phone{width:100%;height:100vh;border-radius:0;box-shadow:none}}
 
 /* screens */
-.screen{position:absolute;inset:0;display:flex;flex-direction:column;background:#fff;transition:transform .34s cubic-bezier(.2,.8,.2,1),opacity .34s;will-change:transform}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;background:#fff;transition:transform .1s cubic-bezier(.2,.8,.2,1),opacity .1s;will-change:transform}
 .screen.enter{transform:translateX(100%)}
 .screen.leave{transform:translateX(-28%);opacity:.6}
 .screen.enter-back{transform:translateX(-28%);opacity:.6}
@@ -140,7 +140,7 @@ h1 em{font-style:normal;color:var(--pri)}
 .field{width:100%;border:1.5px solid var(--line);border-radius:14px;padding:13px 14px;font-size:15px}
 .field:focus{outline:none;border-color:var(--pri)}
 .check{display:flex;gap:12px;align-items:center;padding:12px 0}
-.check .dot{width:28px;height:28px;border-radius:50%;flex:0 0 28px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;background:var(--fill);color:#B0B8C1;transition:all .25s}
+.check .dot{width:28px;height:28px;border-radius:50%;flex:0 0 28px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;background:var(--fill);color:#B0B8C1;transition:all .1s}
 .check.done .dot{background:var(--pri);color:#fff}
 .check.warn .dot{background:var(--warn);color:#fff}
 .check .t{font-weight:700}
@@ -164,9 +164,9 @@ h1 em{font-style:normal;color:var(--pri)}
 .legend i{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
 
 /* sheet */
-.dim{position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .25s;z-index:20}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .1s;z-index:20}
 .dim.on{opacity:1;pointer-events:auto}
-.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:24px 24px 0 0;padding:10px 24px 24px;transform:translateY(105%);transition:transform .3s cubic-bezier(.2,.8,.2,1);z-index:21}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:24px 24px 0 0;padding:10px 24px 24px;transform:translateY(105%);transition:transform .1s cubic-bezier(.2,.8,.2,1);z-index:21}
 .sheet.on{transform:none}
 .sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 16px}
 .toast{position:absolute;left:50%;bottom:96px;transform:translate(-50%,10px);background:rgba(25,31,40,.92);color:#fff;padding:10px 16px;border-radius:12px;font-size:13.5px;opacity:0;transition:all .2s;pointer-events:none;z-index:30;white-space:nowrap}
@@ -207,12 +207,14 @@ const SAMPLE = {
 const ROLES = ["SCM 수요계획팀","영업팀","생산기획팀"];
 const TEAM = "HINT 2기 1조";
 const TEAM_MEMBERS = ["장인우","정재엽","양건휘","장우람","김주영"];
+// 실제 계정 및 서버 저장과 격리된 체험 계정
+const DEMO_ACCOUNT = {id:"__demo__",name:"체험 사용자",role:"SCM 수요계획팀",hasPin:true,loginCount:0};
 
 /* =========================================================
    2. 상태
    ========================================================= */
 const S = {
-  online:false, uid:null, me:null, canWrite:null, role:null, member:null,
+  online:false, demo:false, planStatus:null, uid:null, me:null, canWrite:null, role:null, member:null,
   dataset: clone(SAMPLE), datasetFromServer:false,
   limit:8, method:{}, special:{}, agreed:{},
   plans:[], activity:[], accounts:[], account:null, lastSaved:null
@@ -264,6 +266,15 @@ function handleWriteErr(e){
   else toast(e&&e.message?e.message:"저장하지 못했어요");
 }
 function setMe(me){ S.account=me; S.role=me.role; S.sessionId=me.sessionId; S.sessionStart=me.sessionStart; if(me.limit) S.limit=me.limit; const i=S.accounts.findIndex(a=>a.id===me.id); if(i>=0) S.accounts[i]=me; else S.accounts.push(me); }
+function startDemo(){
+  S.demo=true; S.online=false;
+  S.account={...DEMO_ACCOUNT,sessionStart:new Date().toISOString()};
+  S.role=DEMO_ACCOUNT.role; S.sessionId=null; S.sessionStart=S.account.sessionStart;
+  S.accounts=[S.account]; S.dataset=clone(SAMPLE); S.datasetFromServer=false;
+  S.plans=[]; S.activity=[]; S.lastSaved=null; S.lastPlan=null;
+  S.limit=8; S.method={}; S.special={}; S.agreed={}; S.planStatus="demo";
+  nav.reset("home"); toast("체험 모드 · 변경 내용은 저장되지 않아요");
+}
 async function apiLogin(a,pin){ // 서버에서 비밀번호 확인
   if(!S.online){ a.loginCount=(a.loginCount||0)+1; a.lastLoginAt=new Date().toISOString(); a.online=true; setMe({...a,sessionStart:new Date().toISOString()}); return true; }
   const d=await api("login",{method:"POST",body:{accountId:a.id,pin}}); setMe(d.me); poll(); return true;
@@ -277,6 +288,7 @@ async function apiCreate(name,role,pin){
   const d=await api("accounts",{method:"POST",body:{name,role,pin}}); setMe(d.me); poll(); return true;
 }
 async function logout(){
+  if(S.demo){ window.location.reload(); return; }
   if(S.online){ try{ const r=await api("logout",{method:"POST"}); }catch(e){} }
   else if(S.account){ const a=S.accounts.find(x=>x.id===S.account.id); if(a){a.online=false;a.lastLogoutAt=new Date().toISOString();} }
   S.account=null; S.role=null; S.sessionId=null; S.sessionStart=null; S.lastPlan=null; S.agreed={}; S.method={}; S.special={};
@@ -312,9 +324,12 @@ async function savePlan(A){
   const plan={ month:planMonth(), limit:S.limit, items, total:items.reduce((s,i)=>s+i.qty,0),
     auto:items.filter(i=>i.status==="자동 확정").length, exceptions:items.filter(i=>i.status!=="자동 확정").length,
     confirmedBy:S.account?.id||null, confirmedAt:new Date().toISOString() };
-  S.lastPlan=plan;
+  S.lastPlan=plan; S.planStatus=S.online?"saving":"demo";
   if(!S.online) return plan;
-  try{ const d=await api("plans",{method:"POST",body:{plan}}); S.lastPlan=d.plan; poll(); }catch(e){ handleWriteErr(e); }
+  try{
+    const d=await api("plans",{method:"POST",body:{plan}});
+    S.lastPlan=d.plan; S.planStatus="saved"; if(nav.cur()==="confirm") refresh(); poll();
+  }catch(e){ S.planStatus="failed"; if(nav.cur()==="confirm") refresh(); handleWriteErr(e); }
   return plan;
 }
 async function names(ids){
@@ -375,6 +390,9 @@ login:{ noBar:true, html:()=>{
       <h1>누구로<br>로그인할까요?</h1>
       <p class="lead">${S.online?"내 이름을 누르고 비밀번호 4자리를 입력하세요. 접속 기록이 팀 서버에 남아요.":"서버에 연결되지 않아 둘러보기 모드예요. 저장되지 않아요."}</p>
       ${list.map(a=>`<button class="role" data-acc="${a.id}" style="padding:12px 14px">${avatarHTML(a,44)}<span style="flex:1"><b>${esc(a.name)}</b><br><span class="small">${a.hasPin?`${esc(a.role||"")} · 접속 ${a.loginCount||0}회`:"처음이에요 · 비밀번호를 정해요"}</span></span>${a.online?'<span class="pill ok">접속 중</span>':'<span class="chev">›</span>'}</button>`).join("")}
+      <button class="role" data-demo style="border-color:var(--pri);background:var(--pri-pale);color:var(--pri);font-weight:800">
+        <span class="ic" style="flex:0 0 44px;width:44px;height:44px">D</span><span style="flex:1">가상 체험 로그인<br><span class="small">PIN 0000 · 실제 데이터 저장 안 함</span></span><span class="chev">›</span>
+      </button>
       <button class="role" data-go="signup" style="justify-content:center;color:var(--pri);font-weight:800;border-style:dashed">+ 새 계정 만들기</button>
     </div>`; } },
 
@@ -406,7 +424,7 @@ home:{ title:"", right:"records", html:()=>{
     const last=S.plans[0];
     return `<div class="eyebrow">${esc(S.role||"")} · ${TEAM}</div>
       <h1>${esc(S.account?.name||"팀원")}님,<br>${planMonthKo()} 수요계획을 시작해요</h1>
-      ${!S.online?`<div class="banner">둘러보기 모드 · 서버에 저장되지 않아요</div>`:""}
+      ${!S.online?`<div class="banner">${S.demo?"가상 체험 모드 · PIN 0000 · 변경 내용은 서버에 저장되지 않아요":"둘러보기 모드 · 서버에 저장되지 않아요"}</div>`:""}
       <div class="hero"><div class="k">TO-BE 수요계획</div><div class="h">데이터는 미리 모으고,<br>예외만 사람이 봐요</div><button data-go="merge">${planMonthKo()} 예측 바로 하기</button></div>
       <div class="sec">기획서</div>
       <button class="tapcard" data-go="asis"><div class="ic">1</div><div class="grow" style="flex:1"><b>기획서 처음부터 보기</b><div class="small">현상인식 → 문제제기 → 목적 → 전략 → 기대효과</div></div><span class="chev">›</span></button>
@@ -523,7 +541,7 @@ merge:{ ch:3, title:"① 입력·통합", html:()=>{
           .map((c,i)=>`<div class="check" data-i="${i}"><div class="dot">${c[2]==="warn"?"!":"✓"}</div><div><div class="t">${c[0]}</div><div class="s">${c[1]}</div></div></div>`).join("")}
       </div>
       <div class="card small" style="margin-top:14px">E·C·R·S 중 <b style="color:var(--ink)">C 합치기 · R 바꾸기</b> — 담당자가 따로 모으던 자료를 한 번에 받고, 중복은 기계가 걸러요.</div>`; },
-  mount:el=>{ const is=issues(); el.querySelectorAll(".check").forEach((c,i)=>setTimeout(()=>c.classList.add(i===3&&(is.gaps.length+is.missing.length)?"warn":"done"),250+i*260)); },
+  mount:el=>{ const is=issues(); el.querySelectorAll(".check").forEach((c,i)=>setTimeout(()=>c.classList.add(i===3&&(is.gaps.length+is.missing.length)?"warn":"done"),10+i*15)); },
   cta:()=>{ const is=issues(); return {label:(is.gaps.length+is.missing.length)?"확인하러 가기":"예측하기", go:(is.gaps.length+is.missing.length)?"fix":"loading"}; } },
 
 /* ---------- 데모: 판단 A / ③ 수정 ---------- */
@@ -544,7 +562,7 @@ fix:{ ch:3, title:"◇ 판단 A", html:()=>{
 loading:{ ch:3, title:"② 수요예측", noBack:true, html:()=>`<div style="text-align:center"><div class="spin"></div><h1>4가지 방법으로<br>예측해 보고 있어요</h1>
     <p class="lead">지난 6개월을 모른다고 치고 미리 맞혀 본 뒤,<br>차종마다 가장 잘 맞은 방법을 골라요.</p>
     <div class="card" style="text-align:left" id="ldList">${Object.values(METHODS).map(m=>`<div class="check"><div class="dot">✓</div><div><div class="t">${m.name}</div><div class="s">${m.desc}</div></div></div>`).join("")}</div></div>`,
-  mount:el=>{ el.querySelectorAll("#ldList .check").forEach((c,i)=>setTimeout(()=>c.classList.add("done"),300+i*330)); setTimeout(()=>{ if(nav.cur()==="loading") nav.replace("result"); },1900); },
+  mount:el=>{ el.querySelectorAll("#ldList .check").forEach((c,i)=>setTimeout(()=>c.classList.add("done"),10+i*15)); setTimeout(()=>{ if(nav.cur()==="loading") nav.replace("result"); },100); },
   cta:()=>null },
 
 /* ---------- 데모: 예측 결과 ---------- */
@@ -593,13 +611,13 @@ exception:{ ch:3, title:"◇ 판단 B", html:()=>{
 confirm:{ ch:3, title:"⑤ 확정·공유", noBack:true, html:()=>{
     const p=S.lastPlan; if(!p) return `<div class="spin"></div>`;
     return `<div style="text-align:center"><div class="donecheck">${ICON.check}</div>
-      <h1>${planMonthKo()} 판매계획을<br>확정했어요</h1><p class="lead">${S.online?"팀 서버에 저장했어요. 팀원 누구나 기록에서 볼 수 있어요.":"둘러보기 모드라 저장되지는 않았어요."}</p></div>
+      <h1>${planMonthKo()} 판매계획을<br>확정했어요</h1><p class="lead">${S.online?(S.planStatus==="saved"?"팀 서버에 저장했어요. 팀원 누구나 기록에서 볼 수 있어요.":S.planStatus==="failed"?"서버 저장에 실패했어요. 다시 확인해 주세요.":"팀 서버에 저장하고 있어요…"):"체험 모드라 실제 서버에는 저장되지 않았어요."}</p></div>
       <div class="stats"><div class="stat"><div class="v">${p.auto}</div><div class="l">자동 확정</div><div class="d">회의 없음</div></div>
         <div class="stat"><div class="v" style="color:var(--warn)">${p.exceptions}</div><div class="l">협의 확정</div><div class="d">예외만 회의</div></div>
         <div class="stat"><div class="v" style="font-size:20px;padding-top:6px">${fmt(p.total)}</div><div class="l">합계(대)</div><div class="d">생산·납기로 연계</div></div></div>
       <div class="card" style="margin-top:12px">${p.items.map(i=>`<div class="row"><div class="grow"><div class="t">${esc(i.model)}</div><div class="s">${i.status}${i.memo?` · ${esc(i.memo)}`:""}</div></div><b class="num">${fmt(i.qty)}대</b></div>`).join("")}</div>
       <button class="btn sub" style="width:100%;margin-top:12px;flex:none" data-copy>공유 요약 복사</button>`; },
-  enter:async()=>{ const A=analyzeAll(); await savePlan(A); },
+  enter:()=>{ const A=analyzeAll(); void savePlan(A); },
   cta:()=>({label:"기대효과 보기",go:"effect"}) },
 
 /* ---------- 기대효과 ---------- */
@@ -756,7 +774,7 @@ async function show(id,dir){
   el.innerHTML=frame(id); $("phone").appendChild(el);
   if(sc.mount) sc.mount(el);
   const old=curEl; curEl=el;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{ el.classList.remove("enter","enter-back"); if(old){ old.classList.add(dir==="back"?"leave-back":"leave"); setTimeout(()=>old.remove(),360); } }));
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ el.classList.remove("enter","enter-back"); if(old){ old.classList.add(dir==="back"?"leave-back":"leave"); setTimeout(()=>old.remove(),110); } }));
 }
 function frame(id){
   const sc=SCREENS[id]; const canBack=nav.stack.length>1 && !sc.noBack;
@@ -795,7 +813,8 @@ document.addEventListener("click",async e=>{
   if(d.sheetgo){ closeSheet(); return nav.push(d.sheetgo); }
   if(d.go) return nav.push(d.go);
   if(d.cta!=null){ const c=SCREENS[nav.cur()].cta(); if(!c||c.disabled) return; if(typeof c.go==="function") return c.go(); return nav.push(c.go); }
-  if(d.acc){ const a=S.accounts.find(x=>x.id===d.acc); if(!a) return; S.pinFor=a; S.pin=""; S.pinStage=a.hasPin?"check":"set"; S.pinRole=a.role||null; S.pinErr=""; return nav.push("pin"); }
+  if(d.demo!=null){ S.pinFor=DEMO_ACCOUNT; S.pin=""; S.pinStage="check"; S.pinRole=DEMO_ACCOUNT.role; S.pinErr=""; return nav.push("pin"); }
+   if(d.acc){ const a=S.accounts.find(x=>x.id===d.acc); if(!a) return; S.pinFor=a; S.pin=""; S.pinStage=a.hasPin?"check":"set"; S.pinRole=a.role||null; S.pinErr=""; return nav.push("pin"); }
   if(d.pinrole){ S.pinRole=d.pinrole; refresh(); return; }
   if(d.surole){ const el=$("suName"); if(el) S.suName=el.value; S.suRole=d.surole; refresh(); return; }
   if(d.key!=null){ return pinKey(d.key); }
@@ -835,11 +854,16 @@ async function pinKey(k){
   S.pin+=k; S.pinErr=""; refresh();
   if(S.pin.length<4) return;
   const a=S.pinFor, pin=S.pin; S.pinBusy=true;
-  await new Promise(r=>setTimeout(r,120));
+  await new Promise(r=>setTimeout(r,20));
   try{
     if(S.pinStage==="check"){
-      if(!S.online && a.pin!==pin) throw Object.assign(new Error("비밀번호가 달라요"),{status:401});
-      await apiLogin(a,pin); nav.reset("home"); toast(`${a.name}님, 반가워요`);
+      if(a.id===DEMO_ACCOUNT.id){
+        if(pin!=="0000") throw Object.assign(new Error("가상 체험 PIN은 0000입니다"),{status:401});
+        startDemo();
+      } else {
+        if(!S.online && a.pin!==pin) throw Object.assign(new Error("비밀번호가 달라요"),{status:401});
+        await apiLogin(a,pin); nav.reset("home"); toast(`${a.name}님, 반가워요`);
+      }
     } else if(S.pinStage==="set"){ S.pinFirst=pin; S.pin=""; S.pinStage="confirm"; refresh(); }
     else {
       if(pin!==S.pinFirst){ S.pin=""; S.pinStage="set"; S.pinErr="두 번 입력한 비밀번호가 달라요. 다시 정해 주세요"; refresh(); }
