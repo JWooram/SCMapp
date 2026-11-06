@@ -346,11 +346,11 @@ function avatarHTML(a,size=56){ const c=["#2F6BEA","#0B8A5C","#C25A00","#7B4FD6"
 function accName(id){ return S.accounts.find(a=>a.id===id)?.name||"팀원"; }
 async function loadAudit(){
   if(S.auditLoading) return;
-  if(!S.online||S.demo){ S.auditLogs=[]; S.auditStatus="demo"; if(nav.cur()==="settings") refresh(); return; }
+  if(!S.online||S.demo){ S.auditLogs=[]; S.auditStatus="demo"; if(["settings","logtable"].includes(nav.cur())) refresh(); return; }
   S.auditLoading=true; S.auditStatus="loading"; S.auditError=null;
   try{ const d=await api("audit"); S.auditLogs=Array.isArray(d.list)?d.list:[]; S.auditTotal=d.total||0; S.auditStatus="ok"; }
   catch(e){ S.auditStatus="error"; S.auditError=e.message||"로그를 불러오지 못했어요"; }
-  finally{ S.auditLoading=false; if(nav.cur()==="settings") refresh(); }
+  finally{ S.auditLoading=false; if(["settings","logtable"].includes(nav.cur())) refresh(); }
 }
 
 async function openProfile(){
@@ -440,7 +440,7 @@ const TABS=[
   {id:"settings",label:"설정",icon:tabSvg('<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>')}
 ];
 function tabOf(id){
-  if(id==="settings"||id==="server")return "settings";
+  if(["settings","logtable","server"].includes(id))return "settings";
   if(id==="records")return "records";
   if(["merge","fix","loading","result","detail","exception","confirm"].includes(id))return "merge";
   if(["asis","waste","evidence","goal","ecrs","ai","effect","risk","summary"].includes(id))return "asis";
@@ -752,18 +752,34 @@ settings:{ title:"설정", enter:()=>{ void loadAudit(); }, html:()=>{
     +'<div class="audit-store"><div class="audit-meta"><b>감사 로그 저장소</b><span class="status">● '+status+'</span></div>'
     +'<code>Vercel Blob / db/audit.json</code><div class="small" style="margin-top:7px">로그인 · 로그아웃 · 데이터 수정 · 판매계획 확정 · 계정 관리</div>'
     +'<div class="small">기존 활동 기록과 별도 저장 · 인증된 팀원만 조회</div></div>'
-    +'<div class="sec">로그 내역</div>'
-    +'<div class="audit-meta" style="margin-bottom:10px"><span class="small">전체 '+fmt(S.auditTotal||0)+'건 · 최근 120건 조회</span><button data-audit-refresh '+(S.auditLoading?"disabled":"")+'>↻ 새로고침</button></div>'
-    +'<div class="audit-filter">'+types.map(a=>'<button class="'+(a[0]===S.auditFilter?"on":"")+'" data-audit-filter="'+a[0]+'">'+a[1]+'</button>').join("")+'</div>'
-    +(S.auditStatus==="demo"?'<div class="audit-empty">가상 체험에서는 실제 팀 로그를 열람할 수 없어요.<br>팀원 계정으로 로그인해 주세요.</div>'
-      :S.auditStatus==="loading"||S.auditStatus==="idle"?'<div class="audit-empty">로그 기록을 불러오고 있어요…</div>'
-      :S.auditStatus==="error"?'<div class="audit-empty">'+esc(S.auditError||"로그를 불러올 수 없어요")+'<br>새로고침으로 다시 시도할 수 있어요.</div>'
-      :filtered.length?'<div class="card" style="padding:4px 14px">'+filtered.map(a=>'<div class="audit-entry"><div class="audit-mark">'+(icons[a.type]||"·")+'</div><div class="grow"><div class="t">'+esc(a.text||labels[a.type]||"활동")+'</div><div class="s">'+esc(accName(a.by))+' · '+when(a.at)+' · '+(labels[a.type]||"기타")+(a.meta?.device?' · '+esc(a.meta.device):"")+'</div></div></div>').join("")+'</div>'
-      :'<div class="audit-empty">아직 이 유형의 기록이 없어요.<br>전용 로그 저장소 활성화 이후부터 기록됩니다.</div>')
+    +'<div class="sec">로그테이블</div>'
+    +'<button class="tapcard" data-go="logtable"><div class="ic">≡</div><div class="grow"><b>로그 기록 보기</b><div class="small">로그인 · 데이터 수정 · 판매계획 · 보안 변경 기록</div></div><span class="chev">›</span></button>'
+    +'<p class="small" style="margin:9px 0 0">초기화 이전의 기록은 삭제하고 이후 발생한 로그만 표시합니다. 현재 '+fmt(S.auditTotal||0)+'건</p>'
     +'<div class="sec">앱 관리</div>'
     +'<button class="tapcard" data-go="server"><div class="ic k">DB</div><div class="grow"><b>저장소·API 구조</b><div class="small">데이터가 저장되는 위치 확인</div></div><span class="chev">›</span></button>'
     +'<button class="tapcard" data-logout><div class="ic">↪</div><div class="grow"><b>로그아웃</b><div class="small">현재 세션 종료 및 기록 저장</div></div><span class="chev">›</span></button>'
     +'<p class="small" style="margin:12px 0 15px">PIN 원문은 저장되지 않으며, 비공개 감사 로그는 팀 인증 후에만 조회됩니다.</p>';
+} },
+
+/* ---------- 설정 > 로그테이블 ---------- */
+logtable:{ title:"로그테이블", enter:()=>{ void loadAudit(); }, html:()=>{
+  const filters=[["all","전체"],["login","로그인"],["logout","로그아웃"],["data","데이터"],["plan","계획"],["workspace","업무"],["security","보안"],["account","계정"]];
+  const types={login:"로그인",logout:"로그아웃",data:"데이터",plan:"계획 확정",workspace:"업무 작업",security:"보안 변경",account:"계정"};
+  const rows=(S.auditLogs||[]).filter(x=>S.auditFilter==="all"||x.type===S.auditFilter);
+  const status=S.auditStatus, purge=S.server?.legacyLogsDeleted;
+  return '<div class="eyebrow">SETTINGS · AUDIT TRAIL</div>'
+    +'<h1>로그테이블</h1><p class="lead">팀의 로그인과 업무 변경 사항을 시간순으로 확인합니다. 초기화 이전 기록은 표시되지 않습니다.</p>'
+    +'<div class="audit-meta" style="margin:13px 0"><span class="work-pill">'+(S.online?"인증된 팀원":"체험 모드")+'</span><button data-audit-refresh '+(S.auditLoading?"disabled":"")+'>↻ 새로고침</button></div>'
+    +'<div class="work-summary"><span>총 '+fmt(S.auditTotal||0)+'건</span><span>최근 최대 120건</span><span>'+(purge===true?"기존 로그 정리 완료":purge===false?"기존 로그 정리 확인 중":"새 로그 저장소")+'</span></div>'
+    +'<div class="audit-filter" style="margin:16px 0 10px">'+filters.map(f=>'<button data-audit-filter="'+f[0]+'" class="'+(S.auditFilter===f[0]?"on":"")+'">'+f[1]+'</button>').join("")+'</div>'
+    +(status==="demo"?'<div class="audit-empty">가상 체험 계정은 팀 로그를 열람하지 않습니다.</div>'
+       :status==="loading"||status==="idle"?'<div class="audit-empty">로그테이블을 불러오는 중입니다…</div>'
+       :status==="error"?'<div class="audit-empty">'+esc(S.auditError||"기록을 읽지 못했습니다")+'</div>'
+       :!rows.length?'<div class="audit-empty">해당 유형의 로그가 없습니다. 앞으로의 작업은 여기에 자동 기록됩니다.</div>'
+       :'<div class="log-table-box"><table class="log-table"><thead><tr><th>일시 / 유형</th><th>담당자 / 내용</th></tr></thead><tbody>'
+          +rows.map(x=>'<tr><td><b>'+when(x.at)+'</b><span class="work-pill">'+esc(types[x.type]||x.type||"기타")+'</span></td><td><b>'+esc(accName(x.by))+'</b><span>'+esc(x.text||"업무 처리")+'</span></td></tr>').join("")
+          +'</tbody></table></div>')
+    +'<div class="small" style="margin:16px 0">저장 위치: Vercel Blob · db/logtable/audit-v1.json. 로그는 로그인한 팀원만 조회할 수 있습니다.</div>';
 } },
 
 /* ---------- 기록 ---------- */
@@ -774,8 +790,7 @@ records:{ title:"기록", html:()=>{
       ${S.plans.length?S.plans.map(p=>`<div class="row"><div class="ic g">✓</div><div class="grow"><div class="t">${p.month.replace("-",".")} · ${fmt(p.total)}대</div><div class="s">자동 ${p.auto} · 협의 ${p.exceptions} · 기준 ±${p.limit}% · ${esc(accName(p.confirmedBy))} · ${when(p.confirmedAt)}</div></div></div>`).join(""):`<div class="small">아직 없어요</div>`}
       <div class="sec">팀원 계정 · 로그인 상태</div>
       ${S.accounts.length?[...S.accounts].sort((a,b)=>(b.lastLoginAt||"").localeCompare(a.lastLoginAt||"")).map(m=>`<div class="row">${avatarHTML(m,40)}<div class="grow"><div class="t">${esc(m.name)}</div><div class="s">${esc(m.role||"소속 미정")} · 접속 ${m.loginCount||0}회${m.lastLoginAt?` · 로그인 ${when(m.lastLoginAt)}`:""}${m.lastLogoutAt?` · 로그아웃 ${when(m.lastLogoutAt)}`:""}</div></div>${m.online?'<span class="pill ok">접속 중</span>':m.lastLoginAt?'<span class="pill k">로그아웃</span>':'<span class="pill k">미접속</span>'}</div>`).join(""):`<div class="small">아직 없어요</div>`}
-      <div class="sec">활동 기록 (최근 40개)</div>
-      <div class="feed">${S.activity.length?S.activity.map(a=>`<div class="row"><div class="ic ${a.type==="plan"?"g":a.type==="data"?"o":"k"}">${a.type==="plan"?"✓":a.type==="data"?"D":a.type==="logout"?"←":a.type==="account"?"+":"→"}</div><div class="grow"><div class="t" style="font-size:14px">${esc(a.text)}</div><div class="s">${esc(accName(a.by))} · ${when(a.at)}</div></div></div>`).join(""):`<div class="small">아직 없어요</div>`}</div>`; },
+      <p class="small" style="margin:17px 0">활동 로그는 설정 → 로그테이블에서 확인할 수 있습니다.</p>`; },
   mount:el=>fillNames(el) },
 
 /* ---------- 서버 구조 ---------- */
@@ -815,10 +830,10 @@ db/plans.json      확정한 판매계획 (월별)
   month, items[], total, auto,
   exceptions, limit, confirmedBy, confirmedAt
 
-db/activity.json   활동 기록 (최근 300건)
+db/logtable/activity-v1.json   새 활동 기록 (최근 300건)
   type, text, by, at
 
-db/audit.json      별도 감사 로그 (최근 1,000건)
+db/logtable/audit-v1.json      로그테이블 (최근 1,000건)
   id, type, text, by, at, meta</div>
     <div class="sec">보안</div>
     <div class="row"><div class="grow"><div class="t" style="font-size:14px">비밀번호</div><div class="s">원문은 저장하지 않고 서버에서 scrypt 해시로만 비교 · 5번 틀리면 5분 잠금</div></div></div>
