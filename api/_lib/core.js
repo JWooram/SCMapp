@@ -74,14 +74,18 @@ export async function startSession(acc, req) {
   const token = id(32), at = now();
   const ua = req.headers.get("user-agent") || "";
   const ses = { id: id(8), tokenHash: sha(token), accountId: acc.id, role: acc.role, loginAt: at, logoutAt: null, durationMin: null, device: /Mobi/i.test(ua) ? "모바일" : "PC" };
-  await update(P.sessions, fresh.sessions, d => { d.list.unshift(ses); d.list = d.list.slice(0, 2000); });
-  const updated = await update(P.accounts, fresh.accounts, d => {
-    const a = d.list.find(x => x.id === acc.id);
-    Object.assign(a, { loginCount: (a.loginCount || 0) + 1, lastLoginAt: at, firstLoginAt: a.firstLoginAt || at, online: true, currentSession: ses.id, fails: 0, lockUntil: null,
-      recentLogins: [at, ...(a.recentLogins || [])].slice(0, 10) });
-    return a;
-  });
-  await log("login", `${acc.name} 로그인 (${acc.role})`, acc.id);
+  // 서로 다른 Blob 파일 3개를 병렬로 갱신해 모든 팀원의 로그인 대기시간을 단축합니다.
+  // 인증(checkPin)은 위에서 완료됐으며, 기록이 모두 저장된 후에만 쿠키를 발급합니다.
+  const [, updated] = await Promise.all([
+    update(P.sessions, fresh.sessions, d => { d.list.unshift(ses); d.list = d.list.slice(0, 2000); }),
+    update(P.accounts, fresh.accounts, d => {
+      const a = d.list.find(x => x.id === acc.id);
+      Object.assign(a, { loginCount: (a.loginCount || 0) + 1, lastLoginAt: at, firstLoginAt: a.firstLoginAt || at, online: true, currentSession: ses.id, fails: 0, lockUntil: null,
+        recentLogins: [at, ...(a.recentLogins || [])].slice(0, 10) });
+      return a;
+    }),
+    log("login", `${acc.name} 로그인 (${acc.role})`, acc.id)
+  ]);
   return { token, ses, acc: updated };
 }
 export async function endSession(req) {
